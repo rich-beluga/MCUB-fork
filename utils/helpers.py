@@ -25,7 +25,7 @@ from .emoji_parser import emoji_parser
 from .html_parser import telegram_to_html
 
 
-def get_args(event: Union[Message, events.NewMessage.Event]) -> list[str]:
+def get_args(event: Message | events.NewMessage.Event) -> list[str]:
     """
     Extract command arguments split by spaces, respecting quotes.
 
@@ -55,7 +55,7 @@ def get_args(event: Union[Message, events.NewMessage.Event]) -> list[str]:
         return [parts[1]]
 
 
-def get_args_raw(event: Union[Message, events.NewMessage.Event]) -> str:
+def get_args_raw(event: Message | events.NewMessage.Event) -> str:
     """
     Return the raw argument string (everything after the command).
 
@@ -73,7 +73,7 @@ def get_args_raw(event: Union[Message, events.NewMessage.Event]) -> str:
     return parts[1] if len(parts) > 1 else ""
 
 
-def get_args_html(event: Union[Message, events.NewMessage.Event]) -> str:
+def get_args_html(event: Message | events.NewMessage.Event) -> str:
     """
     Return the command arguments with preserved HTML formatting (if any).
 
@@ -155,7 +155,7 @@ def get_lang(target: Any = None, default: str = "ru") -> str:
 
 
 async def answer(
-    event: Union[Message, events.NewMessage.Event, Any],
+    event: Message | events.NewMessage.Event | Any,
     text: str,
     *,
     reply_markup: Any = None,
@@ -205,7 +205,7 @@ async def answer(
 
 
 async def answer_file(
-    event: Union[Message, events.NewMessage.Event, Any],
+    event: Message | events.NewMessage.Event | Any,
     file: Any,
     caption: str | None = None,
     *,
@@ -260,7 +260,7 @@ def escape_quotes(text: str) -> str:
     return escape_html(text).replace('"', "&quot;")
 
 
-def get_chat_id(event: Union[Message, events.NewMessage.Event]) -> int:
+def get_chat_id(event: Message | events.NewMessage.Event) -> int:
     """
     Return the chat ID (without -100 prefix for channels).
     """
@@ -277,7 +277,7 @@ def get_chat_id(event: Union[Message, events.NewMessage.Event]) -> int:
     return 0
 
 
-async def get_sender_info(event: Union[Message, events.NewMessage.Event]) -> str:
+async def get_sender_info(event: Message | events.NewMessage.Event) -> str:
     """
     Return a formatted string with the sender's name, username and ID.
 
@@ -296,7 +296,7 @@ async def get_sender_info(event: Union[Message, events.NewMessage.Event]) -> str
 
 
 async def get_thread_id(
-    event: Union[Message, events.NewMessage.Event],
+    event: Message | events.NewMessage.Event,
 ) -> int | None:
     """
     Return the thread (topic) ID if the message is in a forum.

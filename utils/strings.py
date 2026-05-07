@@ -7,11 +7,14 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 __all__ = ["Strings", "get_available_locales"]
 
 _FALLBACK = "en"
+_GROUP_VALUE = "__value__"
 
-_LANGPACKS_CACHE: dict[str, dict[str, str]] | None = None
+_LANGPACKS_CACHE: dict[str, dict[str, Any]] | None = None
 
 
 def get_available_locales() -> list[str]:
@@ -35,7 +38,7 @@ def _get_locales_list() -> list[str]:
     return locales
 
 
-def _load_langpacks() -> dict[str, dict[str, str]]:
+def _load_langpacks() -> dict[str, dict[str, Any]]:
     global _LANGPACKS_CACHE
     if _LANGPACKS_CACHE is not None:
         return _LANGPACKS_CACHE
@@ -60,11 +63,88 @@ class _MissingKey(str):
         return self
 
 
+class StringsGroup:
+    """Callable nested string group, e.g. self.strings("error")("key")."""
+
+    def __init__(
+        self, name: str, data: dict[str, Any], *, strict: bool = False
+    ) -> None:
+        self._name = name
+        self._data = data
+        self._strict = strict
+
+    def _lookup(self, key: str) -> Any:
+        value = self._data.get(key)
+        if value is not None:
+            if isinstance(value, dict):
+                return StringsGroup(f"{self._name}.{key}", value, strict=self._strict)
+            return value
+
+        if self._strict:
+            raise KeyError(f"StringsGroup: missing key {self._name}.{key}")
+
+        return _MissingKey(f"[{self._name}.{key}]")
+
+    def __getitem__(self, key: str) -> Any:
+        result = self._lookup(key)
+        if isinstance(result, _MissingKey):
+            raise KeyError(key)
+        return result
+
+    def __call__(self, key: str, **kwargs) -> Any:
+        result = self._lookup(key)
+        if kwargs and isinstance(result, str):
+            return result.format(**kwargs)
+        return result
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._data.get(key, default)
+
+    def keys(self) -> set[str]:
+        return set(self._data.keys())
+
+
+class StringsGroupValue(str):
+    """String value that is also callable as a nested global group."""
+
+    def __new__(
+        cls,
+        value: str,
+        name: str,
+        data: dict[str, Any],
+        *,
+        strict: bool = False,
+    ):
+        obj = str.__new__(cls, value)
+        obj._group = StringsGroup(name, data, strict=strict)
+        return obj
+
+    def __getitem__(self, key: str) -> Any:
+        return self._group[key]
+
+    def __call__(self, key: str, **kwargs) -> Any:
+        return self._group(key, **kwargs)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._group.get(key, default)
+
+    def keys(self) -> set[str]:
+        return self._group.keys()
+
+
+def _wrap_group_value(name: str, value: dict[str, Any], *, strict: bool) -> Any:
+    string_value = value.get(_GROUP_VALUE)
+    group_data = {key: item for key, item in value.items() if key != _GROUP_VALUE}
+    if isinstance(string_value, str):
+        return StringsGroupValue(string_value, name, group_data, strict=strict)
+    return StringsGroup(name, group_data or value, strict=strict)
+
+
 class Strings:
     def __init__(
         self,
         kernel_or_lang,
-        data: dict[str, dict[str, str]],
+        data: dict[str, Any],
         *,
         fallback: str = _FALLBACK,
         strict: bool = False,
@@ -106,20 +186,25 @@ class Strings:
                 f"Strings: no valid locale data found. "
                 f"Requested: {self._locale}, fallback: {fallback}, available: {list(self._data.keys())}"
             )
-        self._active: dict[str, str] = active
+        self._active: dict[str, Any] = active
 
     def _load_from_langpacks(
-        self, module_name: str, data: dict[str, dict[str, str]]
-    ) -> dict[str, dict[str, str]]:
+        self, module_name: str, data: dict[str, Any]
+    ) -> dict[str, dict[str, Any]]:
         langpacks = _load_langpacks()
         fb = _FALLBACK
-        result: dict[str, dict[str, str]] = {}
+        result: dict[str, dict[str, Any]] = {}
 
         locales_to_try = _get_locales_list()
 
         for locale in locales_to_try:
-            pack = langpacks.get(locale, {})
-            module_strings = pack.get(module_name, {})
+            try:
+                from core.langpacks import get_module_strings
+
+                module_strings = get_module_strings(module_name, locale)
+            except ImportError:
+                pack = langpacks.get(locale, {})
+                module_strings = pack.get(module_name, {})
             result[locale] = dict(module_strings)
 
         for locale in locales_to_try:
@@ -139,14 +224,19 @@ class Strings:
     def locale(self) -> str:
         return self._locale
 
-    def _lookup(self, key: str) -> str:
+    def _lookup(self, key: str) -> Any:
         value = self._active.get(key)
         if value is not None:
+            if isinstance(value, dict):
+                return _wrap_group_value(key, value, strict=self._strict)
             return value
 
         for _locale, locale_dict in self._data.items():
             if locale_dict and key in locale_dict:
-                return locale_dict[key]
+                value = locale_dict[key]
+                if isinstance(value, dict):
+                    return _wrap_group_value(key, value, strict=self._strict)
+                return value
 
         if self._strict:
             raise KeyError(
@@ -155,23 +245,31 @@ class Strings:
 
         return _MissingKey(f"[{key}]")
 
-    def __getitem__(self, key: str) -> str:
+    def __getitem__(self, key: str) -> Any:
         result = self._lookup(key)
         if isinstance(result, _MissingKey):
             raise KeyError(key)
         return result
 
-    def __call__(self, key: str, **kwargs) -> str:
-        return self._lookup(key).format(**kwargs) if kwargs else self._lookup(key)
+    def __call__(self, key: str, **kwargs) -> Any:
+        result = self._lookup(key)
+        if kwargs and isinstance(result, str):
+            return result.format(**kwargs)
+        return result
 
-    def get(self, key: str, default: str | None = None) -> str | None:
+    def get(self, key: str, default: Any = None) -> Any:
         value = self._active.get(key)
         if value is not None:
+            if isinstance(value, dict):
+                return _wrap_group_value(key, value, strict=self._strict)
             return value
         fallback_dict = self._data.get(self._fallback, {})
-        return fallback_dict.get(key, default)
+        value = fallback_dict.get(key, default)
+        if isinstance(value, dict):
+            return _wrap_group_value(key, value, strict=self._strict)
+        return value
 
-    def fmt(self, key: str, **kwargs) -> str:
+    def fmt(self, key: str, **kwargs) -> Any:
         return self(key, **kwargs)
 
     def has(self, key: str) -> bool:
@@ -182,7 +280,7 @@ class Strings:
         return set(self._active.keys()) | fallback_keys
 
     @classmethod
-    def validate(cls, data: dict[str, dict[str, str]]) -> list[str]:
+    def validate(cls, data: dict[str, Any]) -> list[str]:
         if not data:
             return ["data dict is empty"]
 
