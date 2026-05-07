@@ -579,8 +579,31 @@ def _create_web_stub(parent_pkg_name: str) -> tuple[types.ModuleType, types.Modu
     return web_mod, core_mod
 
 
+def _create_herokutl_events_module() -> types.ModuleType:
+    try:
+        from telethon import events as telethon_events
+
+        return telethon_events
+    except Exception:
+        events_mod = types.ModuleType("herokutl.events")
+        events_mod.__package__ = "herokutl"
+        return events_mod
+
+
 def _ensure_herokutl_stub() -> None:
     if "herokutl" in sys.modules:
+        herokutl_mod = sys.modules["herokutl"]
+        if not hasattr(herokutl_mod, "events"):
+            events_mod = _create_herokutl_events_module()
+            herokutl_mod.events = events_mod
+            sys.modules["herokutl.events"] = events_mod
+        if (
+            not hasattr(herokutl_mod, "functions")
+            and "herokutl.tl.functions" in sys.modules
+        ):
+            functions_mod = sys.modules["herokutl.tl.functions"]
+            herokutl_mod.functions = functions_mod
+            sys.modules["herokutl.functions"] = functions_mod
         return
 
     herokutl_mod = types.ModuleType("herokutl")
@@ -642,8 +665,17 @@ def _ensure_herokutl_stub() -> None:
     extensions_mod.__path__ = []
     html_mod = types.ModuleType("herokutl.extensions.html")
     html_mod.CUSTOM_EMOJIS = {}
-    html_mod.parse = lambda text: (text, [])
+    try:
+        from telethon.extensions import html as telethon_html
+
+        html_mod.parse = telethon_html.parse
+        html_mod.unparse = telethon_html.unparse
+    except Exception:
+        html_mod.parse = lambda text: (text, [])
+        html_mod.unparse = lambda text, entities=None: text
     extensions_mod.html = html_mod
+
+    events_mod = _create_herokutl_events_module()
 
     hints_mod = types.ModuleType("herokutl.hints")
     hints_mod.Entity = Any
@@ -811,6 +843,7 @@ def _ensure_herokutl_stub() -> None:
         setattr(tl_functions, _group_name, _group_mod)
 
     herokutl_mod.errors = errors_mod
+    herokutl_mod.events = events_mod
     herokutl_mod.extensions = extensions_mod
     herokutl_mod.hints = hints_mod
     herokutl_mod.types = types_mod
@@ -818,12 +851,14 @@ def _ensure_herokutl_stub() -> None:
     herokutl_mod.sessions = sessions_mod
     herokutl_mod.tl = tl_mod
     herokutl_mod.custom = custom_mod
+    herokutl_mod.functions = tl_functions
     tl_mod.types = tl_types
     tl_mod.functions = tl_functions
     tl_mod.custom = tl_custom_mod
 
     sys.modules["herokutl"] = herokutl_mod
     sys.modules["herokutl.errors"] = errors_mod
+    sys.modules["herokutl.events"] = events_mod
     sys.modules["herokutl.errors.common"] = errors_common_mod
     sys.modules["herokutl.errors.rpcerrorlist"] = errors_rpc_mod
     sys.modules["herokutl.extensions"] = extensions_mod
@@ -835,6 +870,7 @@ def _ensure_herokutl_stub() -> None:
     sys.modules["herokutl.tl"] = tl_mod
     sys.modules["herokutl.tl.types"] = tl_types
     sys.modules["herokutl.tl.functions"] = tl_functions
+    sys.modules["herokutl.functions"] = tl_functions
     sys.modules["herokutl.tl.functions.channels"] = tl_func_channels
     sys.modules["herokutl.tl.functions.contacts"] = tl_func_contacts
     sys.modules["herokutl.tl.functions.messages"] = tl_func_messages
