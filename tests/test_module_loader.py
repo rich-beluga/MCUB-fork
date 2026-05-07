@@ -514,6 +514,30 @@ class TestHikkaModuleUnload:
 class TestHikkaModuleConfigSchema:
     """Test Hikka module config schema storage"""
 
+    def test_herokutl_events_import_is_available(self):
+        """Test Heroku modules can import Telethon events via herokutl."""
+        from core.lib.loader.hikka_compat.fake_package import _ensure_fake_package
+
+        _ensure_fake_package()
+
+        from herokutl import events
+        from telethon import events as telethon_events
+
+        assert events is telethon_events
+        assert events.NewMessage is telethon_events.NewMessage
+
+    def test_herokutl_top_level_functions_import_is_available(self):
+        """Test Heroku modules can import TL functions from herokutl."""
+        from core.lib.loader.hikka_compat.fake_package import _ensure_fake_package
+
+        _ensure_fake_package()
+
+        from herokutl import functions
+        from herokutl.tl import functions as tl_functions
+
+        assert functions is tl_functions
+        assert functions.account.UpdateNotifySettingsRequest is not None
+
     @pytest.mark.asyncio
     async def test_hikka_module_config_stores_schema(self):
         """Test that Hikka module config schema is stored for UI"""
