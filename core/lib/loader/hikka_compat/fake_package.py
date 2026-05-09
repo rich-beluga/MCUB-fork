@@ -1927,7 +1927,13 @@ async def load_hikka_module(
                         from .inline_types import CompatMessage
 
                         wrapped_event = (
-                            CompatMessage(event) if hasattr(event, "edit") else event
+                            CompatMessage(
+                                event,
+                                kernel=kernel,
+                                inline_proxy=getattr(instance, "inline", None),
+                            )
+                            if hasattr(event, "edit")
+                            else event
                         )
                         await _m(wrapped_event)
                     except Exception as _e:
@@ -1952,7 +1958,13 @@ async def load_hikka_module(
                 if getattr(instance, "_self_suspended", False):
                     return
                 wrapped_event = (
-                    CompatMessage(event) if hasattr(event, "edit") else event
+                    CompatMessage(
+                        event,
+                        kernel=kernel,
+                        inline_proxy=getattr(instance, "inline", None),
+                    )
+                    if hasattr(event, "edit")
+                    else event
                 )
                 return await _maybe_await(_method(wrapped_event))
 
@@ -2029,6 +2041,9 @@ async def load_hikka_module(
             from .inline_types import BotInlineCall, InlineCall
 
             inline_proxy = getattr(instance, "inline", None)
+            data_str = event.data.decode() if event.data else ""
+            payload = getattr(inline_proxy, "_custom_map", {}).get(data_str, {})
+            unit_id = payload.get("unit_id", "") if isinstance(payload, dict) else ""
             is_bot_message = (
                 getattr(getattr(event, "message", None), "chat", None) is not None
             )
@@ -2036,12 +2051,12 @@ async def load_hikka_module(
                 BotInlineCall(
                     event,
                     inline_proxy=inline_proxy,
-                    unit_id="",
+                    unit_id=unit_id,
                 )
                 if is_bot_message
                 else InlineCall(
-                    event.data.decode() if event.data else "",
-                    unit_id="",
+                    data_str,
+                    unit_id=unit_id,
                     inline_proxy=inline_proxy,
                     original_call=event,
                     inline_message_id=getattr(event, "inline_message_id", None),
@@ -2058,7 +2073,16 @@ async def load_hikka_module(
                     if hasattr(call_obj, "message") and call_obj.message is not None:
                         orig_msg = getattr(call_obj.message, "_message", None)
                         if orig_msg is not None:
-                            call_obj.message = CompatMessage(orig_msg)
+                            call_obj.message = CompatMessage(
+                                orig_msg,
+                                kernel=kernel,
+                                inline_proxy=inline_proxy,
+                                unit_id=getattr(call_obj.message, "unit_id", ""),
+                                chat_id=getattr(call_obj.message, "chat_id", None),
+                                message_id=getattr(
+                                    call_obj.message, "message_id", None
+                                ),
+                            )
                     await _maybe_await(_handler(call_obj))
                 except Exception as _e:
                     kernel.logger.error(
@@ -2089,7 +2113,13 @@ async def load_hikka_module(
                     from .inline_types import CompatMessage
 
                     wrapped_event = (
-                        CompatMessage(event) if hasattr(event, "edit") else event
+                        CompatMessage(
+                            event,
+                            kernel=kernel,
+                            inline_proxy=getattr(instance, "inline", None),
+                        )
+                        if hasattr(event, "edit")
+                        else event
                     )
                     await _maybe_await(_wm(wrapped_event))
                 except Exception as _e:

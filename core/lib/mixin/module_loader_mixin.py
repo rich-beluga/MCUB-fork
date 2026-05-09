@@ -59,6 +59,55 @@ class ModuleLoaderMixin:
         """Parse ``# requires:`` comments from module source."""
         return _parse_requires(code)
 
+    def _purge_stale_loaded_module_entries(self) -> None:
+        """Remove sys.modules entries that point to deleted user module files."""
+        loaded_dir = os.path.abspath(self.k.MODULES_LOADED_DIR)
+        for imported_name, imported_module in list(sys.modules.items()):
+            imported_file = getattr(imported_module, "__file__", None)
+            if not imported_file:
+                continue
+
+            imported_path = os.path.abspath(imported_file)
+            if not imported_path.startswith(loaded_dir + os.sep):
+                continue
+
+            if not os.path.exists(imported_path):
+                sys.modules.pop(imported_name, None)
+                self.k.logger.debug(
+                    "[loader.load] purged stale sys.modules entry name=%r path=%r",
+                    imported_name,
+                    imported_file,
+                )
+
+    def _rename_sys_module_entry(
+        self,
+        old_name: str,
+        new_name: str,
+        module: Any,
+        file_path: str | None = None,
+    ) -> None:
+        """Move a loaded module in sys.modules after class-style name resolution."""
+        module.__name__ = new_name
+        module.__package__ = ""
+        if file_path:
+            module.__file__ = file_path
+            spec = getattr(module, "__spec__", None)
+            if spec is not None:
+                spec.name = new_name
+                spec.origin = file_path
+
+        if old_name == new_name:
+            sys.modules[new_name] = module
+            return
+
+        sys.modules.pop(old_name, None)
+        sys.modules[new_name] = module
+        self.k.logger.debug(
+            "[loader.load] renamed sys.modules entry %r -> %r",
+            old_name,
+            new_name,
+        )
+
     def _parse_source_ast(self, code: str) -> ast.Module | None:
         """Parse python source code into AST."""
         try:
@@ -69,9 +118,9 @@ class ModuleLoaderMixin:
     def _collect_module_base_aliases(
         self, tree: ast.Module
     ) -> tuple[set[str], set[str], set[str]]:
-        """Collect aliases that can reference ModuleBase and command decorator."""
+        """Collect aliases that can reference module base classes and command decorator."""
         module_aliases: set[str] = set()
-        modulebase_names: set[str] = {"ModuleBase"}
+        modulebase_names: set[str] = {"ModuleBase", "Module"}
         command_names: set[str] = {"command"}
 
         for node in tree.body:
@@ -79,20 +128,28 @@ class ModuleLoaderMixin:
                 for alias in node.names:
                     imported = alias.name
                     as_name = alias.asname or imported.split(".")[-1]
-                    if imported.endswith("module_base"):
+                    if imported.endswith("module_base") or imported.endswith(".loader"):
                         module_aliases.add(as_name)
             elif isinstance(node, ast.ImportFrom):
                 mod = node.module or ""
-                if mod.endswith("module_base"):
+                if mod.endswith("module_base") or mod.endswith(".loader"):
                     for alias in node.names:
                         local_name = alias.asname or alias.name
                         if alias.name == "ModuleBase":
+                            modulebase_names.add(local_name)
+                        if alias.name == "Module":
                             modulebase_names.add(local_name)
                         if alias.name == "command":
                             command_names.add(local_name)
                         if alias.name == "*":
                             modulebase_names.add("ModuleBase")
+                            modulebase_names.add("Module")
                             command_names.add("command")
+                else:
+                    for alias in node.names:
+                        local_name = alias.asname or alias.name
+                        if alias.name == "loader":
+                            module_aliases.add(local_name)
 
         return module_aliases, modulebase_names, command_names
 
@@ -105,7 +162,7 @@ class ModuleLoaderMixin:
         if isinstance(expr, ast.Name):
             return expr.id in modulebase_names
 
-        if isinstance(expr, ast.Attribute) and expr.attr == "ModuleBase":
+        if isinstance(expr, ast.Attribute) and expr.attr in {"ModuleBase", "Module"}:
             value = expr.value
             if isinstance(value, ast.Name) and value.id in module_aliases:
                 return True
@@ -117,7 +174,9 @@ class ModuleLoaderMixin:
             if isinstance(cur, ast.Name):
                 parts.append(cur.id)
                 dotted = ".".join(reversed(parts))
-                if dotted.endswith("module_base.ModuleBase"):
+                if dotted.endswith("module_base.ModuleBase") or dotted.endswith(
+                    ".loader.Module"
+                ):
                     return True
 
         return False
@@ -246,13 +305,16 @@ class ModuleLoaderMixin:
 
         doc_ru: str | None = None
         doc_en: str | None = None
+        doc_map: dict[str, str] = {}
         for kw in decorator.keywords:
             if kw.arg == "doc_ru":
                 doc_ru = self._literal_str(kw.value)
             elif kw.arg == "doc_en":
                 doc_en = self._literal_str(kw.value)
+            elif kw.arg == "doc":
+                doc_map = self._literal_dict_str_str(kw.value)
 
-        doc_value = doc_ru or doc_en
+        doc_value = doc_ru or doc_en or doc_map.get("ru") or doc_map.get("en")
         if not doc_value:
             return None
 
@@ -341,21 +403,37 @@ class ModuleLoaderMixin:
             return metadata
 
         # Header comments: # author: ..., # version: ..., # description: ...
-        m = re.search(r"^\s*#\s*author\s*:\s*(.+)$", code, re.MULTILINE)
+        m = re.search(
+            r"^\s*#\s*(?:author|meta\s+developer)\s*:\s*(.+)$",
+            code,
+            re.MULTILINE | re.IGNORECASE,
+        )
         if m:
             header_author = self._parse_header_author(m.group(1))
             if header_author:
                 metadata["author"] = header_author
-        m = re.search(r"^\s*#\s*version\s*:\s*(.+)$", code, re.MULTILINE)
+        m = re.search(
+            r"^\s*#\s*(?:version|meta\s+version)\s*:\s*(.+)$",
+            code,
+            re.MULTILINE | re.IGNORECASE,
+        )
         if m:
             metadata["version"] = m.group(1).strip()
-        m = re.search(r"^\s*#\s*description\s*:\s*(.+)$", code, re.MULTILINE)
+        m = re.search(
+            r"^\s*#\s*(?:description|meta\s+description)\s*:\s*(.+)$",
+            code,
+            re.MULTILINE | re.IGNORECASE,
+        )
         if m:
             header_desc, header_i18n = self._parse_header_description(m.group(1))
             metadata["description"] = header_desc
             if header_i18n:
                 metadata["description_i18n"] = header_i18n
-        m = re.search(r"^\s*#\s*banner(?:_url)?\s*:\s*(.+)$", code, re.MULTILINE)
+        m = re.search(
+            r"^\s*#\s*(?:banner(?:_url)?|meta\s+banner)\s*:\s*(.+)$",
+            code,
+            re.MULTILINE | re.IGNORECASE,
+        )
         if m:
             metadata["banner_url"] = m.group(1).strip()
 
@@ -480,6 +558,8 @@ class ModuleLoaderMixin:
         """
         k = self.k
         try:
+            self._purge_stale_loaded_module_entries()
+
             with open(file_path, encoding="utf-8") as f:
                 code = f.read()
             k.logger.debug(
@@ -616,6 +696,9 @@ class ModuleLoaderMixin:
                         if owner == original_module_name:
                             k.bot_command_owners[cmd] = class_display_name
 
+                    self._rename_sys_module_entry(
+                        original_module_name, class_display_name, module, file_path
+                    )
                     module_name = class_display_name
 
                 k.logger.info(f"Module loaded [class-style]: {module_name}")

@@ -290,16 +290,22 @@ class ModuleDetectorMixin:
                     k.logger.error(f"on_reload error in {module_name}: {e}")
 
             if is_install:
-                try:
-                    if inspect.iscoroutinefunction(instance.on_install):
-                        await instance.on_install()
-                    else:
-                        result = instance.on_install()
-                        if asyncio.iscoroutine(result):
-                            await result
-                    k.logger.debug(f"on_install called for class module: {module_name}")
-                except Exception as e:
-                    k.logger.error(f"on_install error in {module_name}: {e}")
+                flag = f"__installed__{module_name}"
+                already = await k.db_get("mcub_module_flags", flag)
+                if not already:
+                    try:
+                        if inspect.iscoroutinefunction(instance.on_install):
+                            await instance.on_install()
+                        else:
+                            result = instance.on_install()
+                            if asyncio.iscoroutine(result):
+                                await result
+                        await k.db_set("mcub_module_flags", flag, "1")
+                        k.logger.debug(
+                            f"on_install called for class module: {module_name}"
+                        )
+                    except Exception as e:
+                        k.logger.error(f"on_install error in {module_name}: {e}")
 
             return
 

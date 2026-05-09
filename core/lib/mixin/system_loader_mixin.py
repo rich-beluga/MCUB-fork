@@ -35,6 +35,7 @@ class SystemLoaderMixin:
                 # Packaging marker; not an actual system module
                 continue
             module_name = file_name[:-3]
+            original_module_name = module_name
             file_path = os.path.join(k.MODULES_DIR, file_name)
             try:
                 with open(file_path, encoding="utf-8") as f:
@@ -80,6 +81,20 @@ class SystemLoaderMixin:
                                     k.logger.warning(
                                         f"Failed to rename system module file: {e}"
                                     )
+
+                            rename_sys_module = getattr(
+                                self, "_rename_sys_module_entry", None
+                            )
+                            if callable(rename_sys_module):
+                                rename_sys_module(
+                                    original_module_name,
+                                    class_display_name,
+                                    module,
+                                    file_path,
+                                )
+                            else:
+                                sys.modules.pop(original_module_name, None)
+                                sys.modules[class_display_name] = module
 
                             module_name = class_display_name
 

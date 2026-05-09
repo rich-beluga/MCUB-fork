@@ -28,6 +28,10 @@ class UserLoaderMixin:
 
         k = self.k
 
+        purge_stale_modules = getattr(self, "_purge_stale_loaded_module_entries", None)
+        if callable(purge_stale_modules):
+            purge_stale_modules()
+
         try:
             from core.lib.loader.hikka_compat import is_hikka_module, load_hikka_module
 
@@ -131,6 +135,17 @@ class UserLoaderMixin:
                                     k.logger.warning(
                                         f"Failed to rename module file: {e}"
                                     )
+
+                            rename_sys_module = getattr(
+                                self, "_rename_sys_module_entry", None
+                            )
+                            if callable(rename_sys_module):
+                                rename_sys_module(
+                                    module_name, class_display_name, module, file_path
+                                )
+                            else:
+                                sys.modules.pop(module_name, None)
+                                sys.modules[class_display_name] = module
 
                             module_name = class_display_name
 

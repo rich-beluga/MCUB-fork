@@ -45,7 +45,6 @@ class ModuleUnloaderMixin:
         instance = getattr(module, "_class_instance", None)
         if instance is not None:
             if instance._loaded:
-                instance._loaded = False
                 try:
                     if inspect.iscoroutinefunction(instance.on_unload):
                         await instance.on_unload()
@@ -53,8 +52,10 @@ class ModuleUnloaderMixin:
                         result = instance.on_unload()
                         if asyncio.iscoroutine(result):
                             await result
+                    instance._loaded = False
                     k.logger.debug(f"on_unload called for class module: {module_name}")
                 except Exception as e:
+                    instance._loaded = False
                     k.logger.error(f"on_unload error in {module_name}: {e}")
 
                 cleanup_callback_tokens = getattr(
@@ -178,15 +179,7 @@ class ModuleUnloaderMixin:
             try:
                 result = uninstall(k)
                 if asyncio.iscoroutine(result):
-                    try:
-                        loop = asyncio.get_running_loop()
-                        asyncio.ensure_future(result)
-                    except RuntimeError:
-                        k.logger.debug(
-                            "[loader.unregister] uninstall-asyncio-run module=%r",
-                            module_name,
-                        )
-                        asyncio.run(result)
+                    await result
             except Exception as e:
                 k.logger.error(f"Error in uninstall callback of {module_name}: {e}")
         else:

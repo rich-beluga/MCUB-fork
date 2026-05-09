@@ -33,26 +33,97 @@ def _normalize_edit_reply_markup(kwargs: dict, inline_proxy=None) -> dict:
     return kwargs
 
 
+def _event_message_ids(event):
+    message = getattr(event, "message", None)
+    chat_id = getattr(event, "chat_id", None)
+    message_id = getattr(event, "message_id", None)
+
+    if message is not None:
+        chat_id = chat_id or getattr(message, "chat_id", None)
+        message_id = message_id or getattr(message, "id", None)
+        chat = getattr(message, "chat", None)
+        if chat_id is None and chat is not None:
+            chat_id = getattr(chat, "id", None)
+
+    return chat_id, message_id
+
+
+def _callback_data(event) -> str:
+    data = getattr(event, "data", b"") or b""
+    if isinstance(data, bytes):
+        return data.decode(errors="replace")
+    return str(data)
+
+
 class CompatCallbackQuery:
     """Telethon CallbackQuery adapter accepting Hikka reply_markup= on edit()."""
 
     def __init__(self, event, inline_proxy=None):
         self._event = event
         self._inline_proxy = inline_proxy
+        self.data = getattr(event, "data", b"")
+        self.inline_message_id = getattr(event, "inline_message_id", None)
+        self.unit_id = ""
+
+        custom_map = getattr(inline_proxy, "_custom_map", {}) if inline_proxy else {}
+        payload = custom_map.get(_callback_data(event), {})
+        if isinstance(payload, dict):
+            self.unit_id = payload.get("unit_id") or ""
+
+        self.chat_id, self.message_id = _event_message_ids(event)
 
     def __getattr__(self, name: str):
         return getattr(self._event, name)
 
     async def edit(self, *args, **kwargs):
         _normalize_edit_reply_markup(kwargs, self._inline_proxy)
+        edit_unit = getattr(self._inline_proxy, "_edit_unit", None)
+        if callable(edit_unit) and (self.unit_id or self.inline_message_id):
+            edit_reply_markup = kwargs.pop("buttons", None)
+            result = await edit_unit(
+                *args,
+                unit_id=self.unit_id or None,
+                inline_message_id=self.inline_message_id,
+                chat_id=self.chat_id,
+                message_id=self.message_id,
+                reply_markup=edit_reply_markup,
+                **kwargs,
+            )
+            if result:
+                return result
         return await self._event.edit(*args, **kwargs)
 
 
 class CompatMessage:
     """Wrapper for Telethon Message to add HTML formatting support for hikka modules."""
 
-    def __init__(self, message):
+    def __init__(
+        self,
+        message,
+        kernel=None,
+        inline_proxy=None,
+        unit_id: str | None = None,
+        inline_message_id: str | None = None,
+        chat_id: int | None = None,
+        message_id: int | None = None,
+    ):
         self._message = message
+        self._kernel = kernel
+        self._inline_proxy = inline_proxy
+        self.unit_id = unit_id or getattr(message, "unit_id", "") or ""
+        self.inline_message_id = inline_message_id or getattr(
+            message, "inline_message_id", None
+        )
+        self.chat_id = (
+            chat_id if chat_id is not None else getattr(message, "chat_id", None)
+        )
+        self.message_id = (
+            message_id
+            if message_id is not None
+            else getattr(message, "message_id", None)
+        )
+        if self.message_id is None:
+            self.message_id = getattr(message, "id", None)
 
     def __getattr__(self, name: str):
         return getattr(self._message, name)
@@ -77,8 +148,26 @@ class CompatMessage:
 
         _normalize_edit_reply_markup(
             kwargs,
-            getattr(self._message, "_inline_proxy", None),
+            self._inline_proxy or getattr(self._message, "_inline_proxy", None),
         )
+
+        inline_proxy = self._inline_proxy or getattr(
+            self._message, "_inline_proxy", None
+        )
+        edit_unit = getattr(inline_proxy, "_edit_unit", None)
+        if callable(edit_unit) and (self.unit_id or self.inline_message_id):
+            edit_reply_markup = kwargs.pop("buttons", None)
+            result = await edit_unit(
+                *args,
+                unit_id=self.unit_id or None,
+                inline_message_id=self.inline_message_id,
+                chat_id=self.chat_id,
+                message_id=self.message_id,
+                reply_markup=edit_reply_markup,
+                **kwargs,
+            )
+            if result:
+                return result
 
         return await self._message.edit(*args, **kwargs)
 
@@ -163,6 +252,7 @@ class InlineMessage:
         manager = self.inline_manager
         edit_unit = getattr(manager, "_edit_unit", None) if manager else None
         if callable(edit_unit):
+            edit_reply_markup = kwargs.pop("buttons", None)
             try:
                 result = await edit_unit(
                     *args,
@@ -170,6 +260,7 @@ class InlineMessage:
                     inline_message_id=self.inline_message_id or None,
                     chat_id=self.chat_id,
                     message_id=self.message_id,
+                    reply_markup=edit_reply_markup,
                     **kwargs,
                 )
                 if isinstance(result, InlineMessage):
@@ -325,6 +416,10 @@ class InlineCall:
         self.original_call = original_call
         self._answered = False
         self.inline_message_id = inline_message_id
+        if (chat_id is None or message_id is None) and original_call is not None:
+            event_chat_id, event_message_id = _event_message_ids(original_call)
+            chat_id = chat_id if chat_id is not None else event_chat_id
+            message_id = message_id if message_id is not None else event_message_id
         self.message = (
             BotMessage(chat_id, message_id, inline_proxy=inline_proxy, unit_id=unit_id)
             if chat_id is not None and message_id is not None
