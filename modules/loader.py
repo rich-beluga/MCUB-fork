@@ -1472,12 +1472,6 @@ class Loader(ModuleBase):
             None,
         )
 
-        if not reply.document or not file_name:
-            await self._edit_with_emoji(
-                event, self.strings("not_py_file", warning=CUSTOM_EMOJI["warning"])
-            )
-            return
-
         install_log: list[str] = []
 
         def add_log(message: str) -> None:
@@ -1740,12 +1734,6 @@ class Loader(ModuleBase):
                         shutil.rmtree(temp_dir)
                     except Exception:
                         pass
-
-        if not file_name.endswith(".py"):
-            await self._edit_with_emoji(
-                event, self.strings("not_py_file", warning=CUSTOM_EMOJI["warning"])
-            )
-            return
 
         module_name = file_name[:-3]
 
