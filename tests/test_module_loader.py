@@ -169,6 +169,38 @@ class TestUninstallCallback:
         await loader.unregister_module_commands("test_module")
 
     @pytest.mark.asyncio
+    async def test_uninstall_async_callback_is_awaited(self):
+        """Test that async uninstall callback is awaited before unload finishes."""
+        from core.lib.loader.loader import ModuleLoader
+
+        kernel = MagicMock()
+        kernel.loaded_modules = {"test_module": MagicMock()}
+        kernel.system_modules = {}
+        kernel.command_handlers = {}
+        kernel.command_owners = {}
+        kernel.aliases = {}
+        kernel.inline_handlers = {}
+        kernel.inline_handlers_owners = {}
+        kernel.unregister_module_inline_handlers = MagicMock()
+        kernel.logger = MagicMock()
+
+        state = {"done": False}
+
+        async def uninstall_cb(_k):
+            state["done"] = True
+
+        test_module = kernel.loaded_modules["test_module"]
+        test_module.register = MagicMock()
+        test_module.register.__loops__ = []
+        test_module.register.__watchers__ = []
+        test_module.register.__event_handlers__ = []
+        test_module.register.__uninstall__ = uninstall_cb
+
+        loader = ModuleLoader(kernel)
+        await loader.unregister_module_commands("test_module")
+        assert state["done"] is True
+
+    @pytest.mark.asyncio
     async def test_uninstall_removes_handlers_with_specific_event(self):
         """Test that unload removes only the tracked watcher/event bindings."""
         from core.lib.loader.loader import ModuleLoader
@@ -997,6 +1029,22 @@ def register(kernel):
         assert metadata["author"] == "@TypeFrag"
 
     @pytest.mark.asyncio
+    async def test_get_module_metadata_meta_developer_header(self):
+        from core.lib.loader.loader import ModuleLoader
+
+        kernel = MagicMock()
+        loader = ModuleLoader(kernel)
+
+        code = """
+# meta developer: @H_SunMods
+# meta banner: https://example.com/banner.webp
+"""
+
+        metadata = await loader.get_module_metadata(code)
+        assert metadata["author"] == "@H_SunMods"
+        assert metadata["banner_url"] == "https://example.com/banner.webp"
+
+    @pytest.mark.asyncio
     async def test_get_module_metadata_header_description_i18n_inline(self):
         from core.lib.loader.loader import ModuleLoader
 
@@ -1014,6 +1062,85 @@ def register(kernel):
             "ru": "Описание модуля",
             "en": "Module description",
         }
+
+    @pytest.mark.asyncio
+    async def test_get_module_metadata_command_doc_dict(self):
+        from core.lib.loader.loader import ModuleLoader
+
+        kernel = MagicMock()
+        loader = ModuleLoader(kernel)
+
+        code = """
+def register(kernel):
+    @kernel.register.command("term", doc={"en": "run shell", "ru": "запустить shell"})
+    async def term_handler(event):
+        pass
+"""
+
+        metadata = await loader.get_module_metadata(code)
+        assert metadata["commands"]["term"] == "запустить shell"
+
+    @pytest.mark.asyncio
+    async def test_get_module_metadata_hikka_style_class_docstring(self):
+        from core.lib.loader.loader import ModuleLoader
+
+        kernel = MagicMock()
+        loader = ModuleLoader(kernel)
+
+        code = '''
+from hikkatl import loader
+
+class HkMod(loader.Module):
+    """Hikka module docstring description"""
+    strings = {"name": "HkMod"}
+'''
+
+        metadata = await loader.get_module_metadata(code)
+        assert metadata["is_class_style"] is True
+        assert metadata["description"] == "Hikka module docstring description"
+
+
+class TestClassStyleOnInstall:
+    @pytest.mark.asyncio
+    async def test_class_on_install_runs_only_once(self):
+        from core.lib.loader.loader import ModuleLoader
+
+        kernel = MagicMock()
+        kernel.logger = MagicMock()
+        kernel.db_get = AsyncMock(side_effect=[None, "1"])
+        kernel.db_set = AsyncMock()
+
+        loader = ModuleLoader(kernel)
+        module = MagicMock()
+        module.register = MagicMock()
+        module.register.__loops__ = []
+        module.register.__watchers__ = []
+        module.register.__event_handlers__ = []
+
+        class Instance:
+            _loaded = False
+            _loops = []
+
+            def __init__(self):
+                self.on_install_calls = 0
+
+            async def on_load(self):
+                return None
+
+            async def on_reload(self):
+                return None
+
+            async def on_install(self):
+                self.on_install_calls += 1
+
+        inst = Instance()
+        module._class_instance = inst
+
+        await loader.run_post_load(module, "TestMod", is_install=True, is_reload=False)
+        await loader.run_post_load(module, "TestMod", is_install=True, is_reload=False)
+
+        assert inst.on_install_calls == 1
+        kernel.db_set.assert_awaited_once()
 
 
 class TestClassStylePreInstallRequirements:

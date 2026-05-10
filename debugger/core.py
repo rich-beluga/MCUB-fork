@@ -35,7 +35,11 @@ class SourceAnalyzer(ast.NodeVisitor):
         self.symbol_stack: List[Dict[str, str]] = [{}]
         self.current_scope = self.symbol_stack[-1]
         self._noqa_lines: set[int] = self._parse_noqa_comments()
-        print(f"[DEBUGGER] SourceAnalyzer init file={file_path}")
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        """Run module/class rules and then analyze methods inside the class."""
+        self._check_rules(node)
+        self.generic_visit(node)
 
     def _parse_noqa_comments(self) -> set[int]:
         """Parse # noqa: MCUBxxx comments to ignore specific warnings."""
@@ -146,7 +150,9 @@ class SourceAnalyzer(ast.NodeVisitor):
             return self._get_decorator_name(decorator.func)
         return "unknown"
 
-    def _check_rules(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+    def _check_rules(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
+    ) -> None:
         for rule in self.rules.get_rules():
             if rule.should_check(self):
                 warnings = rule.check(self, node)
