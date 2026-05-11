@@ -97,7 +97,7 @@ users = await inline_mgr.get_allowed_users()
 
 MCUB supports temporary inline command handlers via `kernel.register.inline_temp()`.
 
-### Register.register_inline_temp()
+### `Register.inline_temp()`
 
 ```python
 form_id = kernel.register.inline_temp(
@@ -124,19 +124,18 @@ form_id = kernel.register.inline_temp(
 ### Usage
 
 ```python
-@kernel.register.method
-async def setup(kernel):
+async def handle_search(event, args, data=None):
+    # args = "query text" (everything after form_id)
+    await event.answer(f"Searching: {args}")
+
+def register(kernel):
     form_id = kernel.register.inline_temp(
-        self.handle_search,
+        handle_search,
         ttl=600,
         article=lambda e: e.builder.article("Search", text="Enter query..."),
         data={"timeout": 30}
     )
     # form_id = "a1b2c3d4"
-
-async def handle_search(self, event, args, data=None):
-    # args = "query text" (everything after form_id)
-    await event.answer(f"Searching: {args}")
 ```
 
 ### Triggering
@@ -148,7 +147,7 @@ async def handle_search(self, event, args, data=None):
 ### Class-Style Usage
 
 ```python
-from core.lib.loader.module_base import ModuleBase, inline_temp
+from core.lib.loader.module_base import ModuleBase, command, inline_temp
 
 class MyModule(ModuleBase):
     name = "MyModule"
@@ -157,8 +156,8 @@ class MyModule(ModuleBase):
     async def handle_search(self, event, args, data=None):
         await event.answer(f"Result: {args}")
 
-    async def on_load(self):
+    @command("search")
+    async def cmd_search(self, event):
         form_id = self.get_inline_temp_id("handle_search")
-        # Use in buttons:
         await event.edit("Search", buttons=[[self.Button.switch("Search", f"{form_id} ")]])
 ```

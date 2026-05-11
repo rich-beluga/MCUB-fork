@@ -4,6 +4,8 @@
 
 All lifecycle callbacks receive `kernel` as their only argument.
 
+This page describes the function-style `kernel.register` API. In class-style modules, use `async def on_load(self)`, `async def on_unload(self)`, `@on_install`, and `@on_uninstall`; those methods receive `self`, not `kernel`.
+
 ## `@kernel.register.on_load()`
 
 Called after the module is fully registered — on initial startup and on every `reload`.
@@ -44,6 +46,9 @@ async def cleanup(kernel):
 3. All `@register.event` Telethon handlers removed
 4. `@register.uninstall()` callback called
 5. Command entries removed from kernel
+
+> [!NOTE]
+> For class-style modules the equivalent decorator is `@on_uninstall` from `core.lib.loader.module_base`, not `@kernel.register.uninstall()`.
 
 ## Complete Example
 

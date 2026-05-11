@@ -70,6 +70,7 @@
 | Document | Description |
 |----------|-------------|
 | [Enhanced Registration](doc/registration/enhanced-api.md) | Decorator-based registration |
+| [Class-Style Modules](doc/registration/class-style.md) | Object-oriented `ModuleBase` modules and class decorators |
 | [Watchers](doc/registration/watchers.md) | Passive message watchers |
 | [InfiniteLoop](doc/registration/loops.md) | Background loops |
 | [Lifecycle Callbacks](doc/registration/lifecycle.md) | on_load, on_install, uninstall |
@@ -93,6 +94,7 @@
 | [Premium Emoji](doc/reference/emoji.md) | Custom emoji usage |
 | [Telethon-MCUB](doc/reference/telethon.md) | Additional Telethon methods |
 | [AntiScam](doc/reference/antiscam.md) | Account protection |
+| [xlib](doc/lib/xlib.md) | Extended helpers and compatibility utilities |
 
 ---
 

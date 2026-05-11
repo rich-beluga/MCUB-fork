@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any
 from telethon import events
 
-from core.lib.loader.module_base import ModuleBase, command, bot_command, owner, event, method
+from core.lib.loader.module_base import ModuleBase, command, bot_command, owner_only, event, method
 
 class MyModule(ModuleBase):
     name = "MyModule"
@@ -30,7 +30,7 @@ class MyModule(ModuleBase):
         await event.reply("Hello from bot!")
 
     @command("admin")
-    @owner(only_admin=True)
+    @owner_only(only_admin=True)
     async def cmd_admin(self, event: events.NewMessage.Event) -> None:
         await event.reply("Admin access granted!")
 
@@ -103,13 +103,13 @@ async def cmd_start(self, event):
 
 **Parameters:** Same as `@command`
 
-### `@owner(only_admin=False)`
+### `@owner_only(only_admin=False)`
 
 Decorator for owner/admin permission check. Use after `@command` or `@bot_command`.
 
 ```python
 @command("admin")
-@owner(only_admin=True)
+@owner_only(only_admin=True)
 async def cmd_admin(self, event):
     await event.reply("Admin access granted!")
 ```
@@ -125,23 +125,24 @@ async def cmd_admin(self, event):
 **Parameters:**
 - `only_admin` (bool): If True, only bot admins can use this command (default: False)
 
-### `@permission(**tags)`
+### `@permissions(*, log_level="error", **tags)` / `@permission(...)`
 
-Decorator for applying event filters to handlers, similar to `@watcher`. Can be stacked on commands, bot commands, watchers, and events.
+Decorator for applying event filters to handlers, similar to `@watcher`. Can be stacked on commands, bot commands, watchers, and events. `permission` is a backward-compatible alias for `permissions`.
 
 ```python
 @command("secret")
-@permission(only_pm=True, out=True)
+@permissions(only_pm=True, out=True)
 async def cmd_secret(self, event):
     await event.reply("Secret!")
 
 @command("group")
-@permission(only_groups=True, contains="!stats")
+@permission(only_groups=True, contains="!stats")  # alias of @permissions
 async def cmd_stats(self, event):
     await event.reply("Stats!")
 ```
 
 **Available tags:** Same as `@watcher`:
+- `log_level` (str): logging level stored with the permission metadata (default: `"error"`)
 - Direction: `incoming`, `out`
 - Chat type: `only_pm`, `no_pm`, `only_groups`, `no_groups`, `only_channels`, `no_channels`
 - Content: `only_media`, `no_media`, `only_photos`, `no_videos`, `only_audios`, `only_docs`, `only_stickers`
@@ -152,7 +153,7 @@ async def cmd_stats(self, event):
 **Use cases:**
 - Filter commands to specific chat types
 - Add regex/text matching conditions to commands
-- Combine with `@owner` for both permission and chat type filtering
+- Combine with `@owner_only` for both permission and chat type filtering
 
 ### `@error_handler(*, log_level="error", reraise=False, message=None)`
 
@@ -924,7 +925,7 @@ from typing import Any
 from telethon import events
 
 from core.lib.loader.module_base import (
-    ModuleBase, command, bot_command, owner, callback, watcher, loop, event, method
+    ModuleBase, command, bot_command, owner_only, callback, watcher, loop, event, method
 )
 
 class CounterModule(ModuleBase):
@@ -942,7 +943,7 @@ class CounterModule(ModuleBase):
         await event.reply(f"Count: {self._counter}")
 
     @command("admin")
-    @owner(only_admin=True)
+    @owner_only(only_admin=True)
     async def cmd_admin(self, event: events.NewMessage.Event) -> None:
         await event.reply("Admin panel coming soon!")
 
