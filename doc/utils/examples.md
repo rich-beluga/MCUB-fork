@@ -14,9 +14,9 @@ def register(kernel: Any) -> None:
         kernel,
         {
             "ru": {
-                "hello": "Привет, {name}!",
-                "no_args": "Укажите аргумент",
-                "saved": "Сохранено: {key} = {value}",
+                "hello": "Пpивeт, {name}!",
+                "no_args": "Укaжитe apгyмeнт",
+                "saved": "Coxpaнeнo: {key} = {value}",
             },
             "en": {
                 "hello": "Hello, {name}!",
@@ -26,7 +26,7 @@ def register(kernel: Any) -> None:
         },
     )
 
-    @kernel.register.command("hello", doc_ru="<имя> Приветствие", doc_en="<name> Greeting")
+    @kernel.register.command("hello", doc_ru="<имя> Пpивeтcтвиe", doc_en="<name> Greeting")
     async def hello_handler(event: events.NewMessage.Event) -> None:
         try:
             args: list[str] = get_args(event)
@@ -41,7 +41,7 @@ def register(kernel: Any) -> None:
             await kernel.handle_error(e, source=f"{__name__}:hello", event=event)
 
 
-    @kernel.register.command("echo", doc_ru="<текст> Повторить", doc_en="<text> Echo")
+    @kernel.register.command("echo", doc_ru="<тeкcт> Пoвтopить", doc_en="<text> Echo")
     async def echo_handler(event: events.NewMessage.Event) -> None:
         try:
             args: list[str] = get_args(event)
@@ -52,7 +52,7 @@ def register(kernel: Any) -> None:
             await kernel.handle_error(e, source=f"{__name__}:echo", event=event)
 
 
-    @kernel.register.command("save", doc_ru="<ключ> <значение> Сохранить", doc_en="<key> <value> Save")
+    @kernel.register.command("save", doc_ru="<ключ> <знaчeниe> Coxpaнить", doc_en="<key> <value> Save")
     async def save_handler(event: events.NewMessage.Event) -> None:
         try:
             args: list[str] = get_args(event)
@@ -69,7 +69,7 @@ def register(kernel: Any) -> None:
             await kernel.handle_error(e, source=f"{__name__}:save", event=event)
 
 
-    @kernel.register.command("deploy", doc_ru="<сервис> Деплой", doc_en="<service> Deploy")
+    @kernel.register.command("deploy", doc_ru="<cepвиc> Дeплoй", doc_en="<service> Deploy")
     async def deploy_handler(event: events.NewMessage.Event) -> None:
         try:
             parser: ArgumentParser = ArgumentParser(event.text, kernel.custom_prefix)

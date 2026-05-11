@@ -13,13 +13,13 @@ Manages temporary permissions for callback query patterns.
 
 ### Methods
 
-`allow(user_id, pattern, duration_seconds=60)` — Grant permission for a user to trigger callbacks.
+`allow(user_id, pattern, duration_seconds=60)` - Grant permission for a user to trigger callbacks.
 
-`is_allowed(user_id, pattern)` — Check if a user has permission for a callback pattern. Returns `bool`.
+`is_allowed(user_id, pattern)` - Check if a user has permission for a callback pattern. Returns `bool`.
 
-`prohibit(user_id, pattern=None)` — Revoke permission(s) for a user.
+`prohibit(user_id, pattern=None)` - Revoke permission(s) for a user.
 
-`cleanup()` — Remove expired permissions (automatically called internally).
+`cleanup()` - Remove expired permissions (automatically called internally).
 
 ### Usage
 
@@ -56,17 +56,17 @@ inline_mgr = InlineManager(kernel)
 
 ### Methods
 
-`is_admin(user_id)` — Check if user is the bot admin.
+`is_admin(user_id)` - Check if user is the bot admin.
 
-`is_allowed(user_id, command=None)` — Check if user is allowed to use inline commands.
+`is_allowed(user_id, command=None)` - Check if user is allowed to use inline commands.
 
-`allow_user(user_id, command=None)` — Grant permission to a user.
+`allow_user(user_id, command=None)` - Grant permission to a user.
 
-`deny_user(user_id, command=None)` — Revoke permission from a user.
+`deny_user(user_id, command=None)` - Revoke permission from a user.
 
-`get_allowed_users(command=None)` — Get list of allowed users.
+`get_allowed_users(command=None)` - Get list of allowed users.
 
-`clear_all()` — Clear all permissions.
+`clear_all()` - Clear all permissions.
 
 ### Auto-generated inline callbacks (token → handler)
 

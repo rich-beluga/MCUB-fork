@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 import shutil
 
@@ -53,10 +53,10 @@ class ModuleCompatChecker:
         Handles '# scop: kernel ...' directives.
 
         Supported forms:
-            kernel min v{version}       — require current >= version
-            kernel max v{version}       — require current <= version
-            kernel v{version}           — require current == version
-            kernel v[__lastest__]       — require current == latest in repo
+            kernel min v{version}       - require current >= version
+            kernel max v{version}       - require current <= version
+            kernel v{version}           - require current == version
+            kernel v[__lastest__]       - require current == latest in repo
         """
         parts = params.split()
         if not parts:

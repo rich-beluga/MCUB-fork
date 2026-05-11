@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 # MCUB interactive shell - runs inside the kernel's asyncio event loop.
 # Commands live in console/bin/<n>.py and expose run(shell, args).
@@ -141,7 +141,7 @@ class _Anim:
         for ch in title:
             cls._w(ch)
             time.sleep(0.022)
-        cls._w(f"{_C.RESET}  {_C.GREY}v{version}  ·  {py}{_C.RESET}\n")
+        cls._w(f"{_C.RESET}  {_C.GREY}v{version}  .  {py}{_C.RESET}\n")
 
         # Separator fills left-to-right with colour wave
         for i in range(sep_len):
@@ -393,7 +393,7 @@ class _LineEditor:
             sys.stdout.flush()
             return
 
-        # Build right-prompt (time) — only when cursor is at end for simplicity
+        # Build right-prompt (time) - only when cursor is at end for simplicity
         now = datetime.now().strftime("%H:%M:%S")
         rprompt = f"{_C.GREY}{now}{_C.RESET}"
         rprompt_w = len(now)  # visible width
@@ -473,7 +473,7 @@ class _LineEditor:
             return
         prefix = parts[0] if parts else ""
         if self._tab_candidates and self._tab_index >= 0:
-            # already cycling — advance
+            # already cycling - advance
             self._tab_index = (self._tab_index + 1) % len(self._tab_candidates)
         else:
             all_cmds = _all_commands()
@@ -574,7 +574,7 @@ class _LineEditor:
                         self._cur = 0
                         self._render()
                         continue
-                    elif ch == "\x12":  # another Ctrl+R — cycle
+                    elif ch == "\x12":  # another Ctrl+R - cycle
                         # find next match before current
                         for i in range(len(self._history) - 1, -1, -1):
                             if (
@@ -597,7 +597,7 @@ class _LineEditor:
                     sys.stdout.flush()
                     return "".join(self._buf)
 
-                elif ch == "\t":  # Tab — completion
+                elif ch == "\t":  # Tab - completion
                     self._tab_complete()
 
                 elif ch == "\x03":  # Ctrl+C
@@ -715,8 +715,8 @@ class ShellLogHandler(logging.Handler):
 
 class _StdoutToShell:
     """
-    Перехватывает print() и любой вывод в stdout,
-    добавляя \\r перед каждой строкой чтобы не ломать промпт.
+    Пepexвaтывaeт print() и любoй вывoд в stdout,
+    дoбaвляя \\r пepeд кaждoй cтpoкoй чтoбы нe лoмaть пpoмпт.
     """
 
     def __init__(self, shell: "Shell", original_stdout):
@@ -896,7 +896,7 @@ class Shell:
         out_fd.flush()
 
     def _print_header(self) -> None:
-        """Simple re-draw for clear/cls — no animation to avoid blocking."""
+        """Simple re-draw for clear/cls - no animation to avoid blocking."""
         title = self.cfg.get("display", "title", fallback="MCUB Shell")
         sep_char = self.cfg.get("shell", "separator", fallback="─")
         cols = _terminal_width()
@@ -904,7 +904,7 @@ class Shell:
         py = f"Python {sys.version.split()[0]}"
         print(
             f"\n{_C.CYAN}{_C.BOLD}  {title}{_C.RESET}  "
-            f"{_C.GREY}v{self.VERSION}  ·  {py}{_C.RESET}"
+            f"{_C.GREY}v{self.VERSION}  .  {py}{_C.RESET}"
         )
         print(f"{_C.GREY}{sep}{_C.RESET}")
         print(
@@ -961,7 +961,7 @@ class Shell:
                 )
                 line = await loop.run_in_executor(None, editor.read)
             except KeyboardInterrupt:
-                self.output(f"{_C.GREY}  (Ctrl+C — type 'exit' to quit){_C.RESET}")
+                self.output(f"{_C.GREY}  (Ctrl+C - type 'exit' to quit){_C.RESET}")
                 continue
             except (EOFError, Exception):
                 break
@@ -1019,7 +1019,7 @@ class Shell:
 
         mod = _load_command(name)
         if mod is None:
-            # Did you mean? — find closest command
+            # Did you mean? - find closest command
             suggestion = self._did_you_mean(name)
             msg = f"{_C.RED}Unknown command '{name}'.{_C.RESET}"
             if suggestion:
@@ -1111,7 +1111,7 @@ class Shell:
     def _run_bash_pty(self, env: dict, cwd: "Path", pwd_file: str) -> None:
         """
         Spawn bash in a real pseudo-terminal and bridge stdin ↔ master ↔ stdout.
-        Blocking — meant to run in an executor thread.
+        Blocking - meant to run in an executor thread.
         """
         stdin_fd = sys.stdin.fileno()
 

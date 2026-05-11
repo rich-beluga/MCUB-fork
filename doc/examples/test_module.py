@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 """
 TestModule - Real-kernel testing module for MCUB.
@@ -30,16 +30,16 @@ class TestModule(ModuleBase):
     name = "TestModule"
     version = "1.0.0"
     author = "@hairpin01"
-    description = {"ru": "Тестовый модуль", "en": "Test module"}
+    description = {"ru": "Тecтoвый мoдyль", "en": "Test module"}
 
     strings = {
         "ru": {
-            "test_pass": "✅ Тест {name} пройден",
-            "test_fail": "❌ Тест {name} провален: {error}",
-            "test_skip": "⚠️ Тест {name} пропущен",
-            "results": "<b>Результаты тестирования:</b>\n\n{results}",
-            "run_tests": "Запустить тесты",
-            "test_module": "Тестировать модуль",
+            "test_pass": "✅ Тecт {name} пpoйдeн",
+            "test_fail": "❌ Тecт {name} пpoвaлeн: {error}",
+            "test_skip": "⚠️ Тecт {name} пpoпyщeн",
+            "results": "<b>Peзyльтaты тecтиpoвaния:</b>\n\n{results}",
+            "run_tests": "Зaпycтить тecты",
+            "test_module": "Тecтиpoвaть мoдyль",
         },
         "en": {
             "test_pass": "✅ Test {name} passed",
@@ -51,12 +51,12 @@ class TestModule(ModuleBase):
         },
     }
 
-    @command("test", doc_ru="Запустить тесты", doc_en="Run tests")
+    @command("test", doc_ru="Зaпycтить тecты", doc_en="Run tests")
     async def cmd_test(self, event: events.NewMessage.Event) -> None:
         results = await self._run_all_tests()
         await self.edit(event, f"<b>Test Results:</b>\n\n{results}", as_html=True)
 
-    @command("testmod", doc_ru="Информация о тестах", doc_en="Test info")
+    @command("testmod", doc_ru="Инфopмaция o тecтax", doc_en="Test info")
     async def cmd_testmod(self, event: events.NewMessage.Event) -> None:
         test_methods = [
             m for m in dir(self) if m.startswith("test_") and callable(getattr(self, m))
@@ -120,7 +120,7 @@ class TestModule(ModuleBase):
 
     def test_strings_locale_mode(self) -> bool:
         test_strings = {
-            "ru": {"hello": "Привет {name}!"},
+            "ru": {"hello": "Пpивeт {name}!"},
             "en": {"hello": "Hello {name}!"},
         }
         self._strings = test_strings

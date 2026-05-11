@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ def get_args(event: Message | events.NewMessage.Event) -> list[str]:
     try:
         return shlex.split(parts[1])
     except ValueError:
-        # Unclosed quotes – treat the remainder as a single argument
+        # Unclosed quotes - treat the remainder as a single argument
         return [parts[1]]
 
 
@@ -223,7 +223,7 @@ async def answer_file(
         # Inline context: cannot send a real file → send a plain text notice without the file
         return await answer(event, caption or None, file=None, **kwargs)
 
-    # Regular chat – send as a document
+    # Regular chat - send as a document
     chat_id = event.chat_id
     thread_id = await get_thread_id(event) if hasattr(event, "client") else None
     reply_to = thread_id or event.id

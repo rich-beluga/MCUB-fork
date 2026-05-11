@@ -7,9 +7,9 @@ tasks are async and must be awaited.
 
 ## Lifecycle Methods
 
-`await kernel.scheduler.start()` — Start the task scheduler and set `running = True`.
+`await kernel.scheduler.start()` - Start the task scheduler and set `running = True`.
 
-`await kernel.scheduler.stop()` — Stop all scheduled tasks, wait for cancellation, and clear the task list.
+`await kernel.scheduler.stop()` - Stop all scheduled tasks, wait for cancellation, and clear the task list.
 
 ## Task Management
 
@@ -42,8 +42,8 @@ await kernel.scheduler.add_daily_task(daily_report, hour=9, minute=30)
 
 **Parameters:**
 - `func`: async callable with no arguments.
-- `hour` (`int`): 0–23.
-- `minute` (`int`): 0–59.
+- `hour` (`int`): 0-23.
+- `minute` (`int`): 0-59.
 
 **Raises:** `ValueError` if `hour` or `minute` is outside the valid range.
 
@@ -66,19 +66,19 @@ task_id = await kernel.scheduler.add_task(delayed_alert, 300, task_id="my_alert"
 
 **Returns:** The task ID string.
 
-`kernel.scheduler.cancel_task(task_id) -> bool` — Cancel a one-shot task registered with `add_task`. Returns `True` if found and cancelled.
+`kernel.scheduler.cancel_task(task_id) -> bool` - Cancel a one-shot task registered with `add_task`. Returns `True` if found and cancelled.
 
-`kernel.scheduler.cancel_all_tasks()` — Synchronously cancel all tasks, set `running = False`, clear the task list and one-shot registry. Unlike `stop()`, it does not await task cancellation.
+`kernel.scheduler.cancel_all_tasks()` - Synchronously cancel all tasks, set `running = False`, clear the task list and one-shot registry. Unlike `stop()`, it does not await task cancellation.
 
-`await kernel.scheduler.remove_task(task) -> bool` — Remove and cancel a specific asyncio task. Returns `True` if it was found.
+`await kernel.scheduler.remove_task(task) -> bool` - Remove and cancel a specific asyncio task. Returns `True` if it was found.
 
 ## Query Methods
 
-`kernel.scheduler.get_tasks() -> list[dict]` — Get status summary of all scheduled tasks. Returns dicts with `name` and `status` (`"running"` or `"stopped"`).
+`kernel.scheduler.get_tasks() -> list[dict]` - Get status summary of all scheduled tasks. Returns dicts with `name` and `status` (`"running"` or `"stopped"`).
 
-`kernel.scheduler.get_active_tasks() -> list[asyncio.Task]` — Get a copy of all asyncio Task objects.
+`kernel.scheduler.get_active_tasks() -> list[asyncio.Task]` - Get a copy of all asyncio Task objects.
 
-`kernel.scheduler.get_task_count() -> int` — Get number of scheduled tasks currently tracked.
+`kernel.scheduler.get_task_count() -> int` - Get number of scheduled tasks currently tracked.
 
 ---
 

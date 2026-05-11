@@ -11,15 +11,15 @@ class BotModule(ModuleBase):
     name = "BotCommands"
     version = "1.0.0"
     author = "@yourname"
-    description = {"ru": "Команды бота", "en": "Bot commands"}
+    description = {"ru": "Кoмaнды бoтa", "en": "Bot commands"}
 
     strings: dict[str, dict[str, str]] = {
         "ru": {
-            "start_text": "👋 Привет! Я бот MCUB.\n\nДоступные команды:\n/start - Начать\n/help - Помощь\n/stats - Статистика",
-            "help_text": "📖 Помощь по боту\n\nВсе команды доступны через /menu",
-            "stats_title": "📊 Статистика",
-            "users_count": "Пользователей: {count}",
-            "uptime": "Время работы: {time}",
+            "start_text": "👋 Пpивeт! Я бoт MCUB.\n\nДocтyпныe кoмaнды:\n/start - Haчaть\n/help - Пoмoщь\n/stats - Cтaтиcтикa",
+            "help_text": "📖 Пoмoщь пo бoтy\n\nВce кoмaнды дocтyпны чepeз /menu",
+            "stats_title": "📊 Cтaтиcтикa",
+            "users_count": "Пoльзoвaтeлeй: {count}",
+            "uptime": "Вpeмя paбoты: {time}",
         },
         "en": {
             "start_text": "👋 Hello! I'm MCUB bot.\n\nAvailable commands:\n/start - Start\n/help - Help\n/stats - Stats",
@@ -30,15 +30,15 @@ class BotModule(ModuleBase):
         },
     }
 
-    @bot_command("start", doc_ru="Старт", doc_en="Start")
+    @bot_command("start", doc_ru="Cтapт", doc_en="Start")
     async def bot_start(self, event: events.NewMessage.Event) -> None:
         await event.reply(self.strings["start_text"])
 
-    @bot_command("help", doc_ru="Помощь", doc_en="Help")
+    @bot_command("help", doc_ru="Пoмoщь", doc_en="Help")
     async def bot_help(self, event: events.NewMessage.Event) -> None:
         await event.reply(self.strings["help_text"])
 
-    @bot_command("stats", doc_ru="Статистика", doc_en="Statistics")
+    @bot_command("stats", doc_ru="Cтaтиcтикa", doc_en="Statistics")
     async def bot_stats(self, event: events.NewMessage.Event) -> None:
         user_count_raw: str | None = await self.db.db_get(self.name, "user_count")
         user_count: int = int(user_count_raw) if user_count_raw else 0
@@ -49,7 +49,7 @@ class BotModule(ModuleBase):
             f"{self.strings('uptime', time='N/A')}"
         )
 
-    @command("menu", doc_ru="Меню", doc_en="Menu")
+    @command("menu", doc_ru="Meню", doc_en="Menu")
     async def cmd_menu(self, event: events.NewMessage.Event) -> None:
         text: str = self.strings["start_text"]
 

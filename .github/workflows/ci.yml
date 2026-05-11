@@ -50,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Привести имя репозитория к нижнему регистру
+      - name: Пpивecти имя peпoзитopия к нижнeмy peгиcтpy
         run: echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx

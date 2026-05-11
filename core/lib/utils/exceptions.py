@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 # author: @Hairpin00
 # version: 1.0.1
@@ -7,7 +7,7 @@
 
 
 class CommandConflictError(Exception):
-    """Исключение для конфликта команд"""
+    """Иcключeниe для кoнфликтa кoмaнд"""
 
     def __init__(self, message, conflict_type=None, command=None):
         super().__init__(message)

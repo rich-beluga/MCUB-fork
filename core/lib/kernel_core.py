@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 # ---- meta data ------ kernel_core ----------------
 # author: @Hairpin00
-# description: Kernel core mixin — initialization, config, registries
+# description: Kernel core mixin - initialization, config, registries
 # --- meta data end ---------------------------------
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ except ImportError:
 
 
 class KernelCoreMixin:
-    """Kernel core mixin — initialization, config, registries, utilities."""
+    """Kernel core mixin - initialization, config, registries, utilities."""
 
     MAX_PATTERN_LENGTH = 256
     PATTERN_TIMEOUT = 0.1

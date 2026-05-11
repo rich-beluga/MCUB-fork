@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ class CommandModule(ModuleBase):
     name = "command"
     version = "1.2.0"
     author = "@hairpin00"
-    description = {"ru": "Обработчики команд бота", "en": "Bot command handlers"}
+    description = {"ru": "Oбpaбoтчики кoмaнд бoтa", "en": "Bot command handlers"}
 
     strings = {"name": "command"}
 
@@ -209,10 +209,10 @@ class CommandModule(ModuleBase):
         backup_buttons = [
             [
                 self.Button.inline(
-                    "Yes / Да", self.cb_backup, data="backup_setup_yes", style="success"
+                    "Yes / Дa", self.cb_backup, data="backup_setup_yes", style="success"
                 ),
                 self.Button.inline(
-                    "No / Нет", self.cb_backup, data="backup_setup_no", style="danger"
+                    "No / Heт", self.cb_backup, data="backup_setup_no", style="danger"
                 ),
             ]
         ]

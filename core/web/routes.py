@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -218,7 +218,7 @@ async def api_send_code(request: web.Request) -> web.Response:
         from telethon import TelegramClient
         from telethon.errors import FloodWaitError
     except ImportError:
-        return _err("telethon is not installed — run: pip install telethon")
+        return _err("telethon is not installed - run: pip install telethon")
 
     log.debug("[setup] Creating TelegramClient for send_code")
 
@@ -297,7 +297,7 @@ async def api_qr_login(request: web.Request) -> web.Response:
     try:
         from telethon import TelegramClient, functions
     except ImportError:
-        return _err("telethon is not installed — run: pip install telethon")
+        return _err("telethon is not installed - run: pip install telethon")
 
     log.debug("[setup] Creating TelegramClient for QR login")
 
@@ -487,7 +487,7 @@ async def api_verify_code(request: web.Request) -> web.Response:
     state: dict = request.app.get("setup_state") or {}
     client = state.get("client")
     if client is None:
-        return _err("No active session — please go back to step 1")
+        return _err("No active session - please go back to step 1")
 
     try:
         data = await request.json()
@@ -562,13 +562,13 @@ async def api_verify_code(request: web.Request) -> web.Response:
             return web.json_response({"requires_2fa": True})
 
     except PhoneCodeInvalidError:
-        return _err("Invalid code — please check and try again")
+        return _err("Invalid code - please check and try again")
 
     except PhoneCodeExpiredError:
-        return _err("Code expired — go back and request a new one")
+        return _err("Code expired - go back and request a new one")
 
     except FloodWaitError as exc:
-        return _err(f"Too many attempts — wait {exc.seconds}s", status=429)
+        return _err(f"Too many attempts - wait {exc.seconds}s", status=429)
 
     except Exception as exc:
         tb = traceback.format_exc()
@@ -701,7 +701,7 @@ def _friendly_error(exc: Exception) -> str:
     if "phone" in low and "invalid" in low:
         return "Invalid phone number"
     if "connection" in low or "connect" in low:
-        return f"Connection failed — check your internet. {s}"
+        return f"Connection failed - check your internet. {s}"
     return s or repr(exc)
 
 

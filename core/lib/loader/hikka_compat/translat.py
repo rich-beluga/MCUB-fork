@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 import types
 from typing import Any
@@ -150,14 +150,14 @@ _translations_mod.translator = _translator_stub
 _translations_mod.fmt = _fmt
 _translations_mod.SUPPORTED_LANGUAGES = {
     "en": "🇬🇧 English",
-    "ru": "🇷🇺 Русский",
-    "ua": "🇺🇦 Український",
+    "ru": "🇷🇺 Pyccкий",
+    "ua": "🇺🇦 Укpaїнcький",
     "de": "🇩🇪 Deutsch",
     "jp": "🇯🇵 日本語",
 }
 _translations_mod.MEME_LANGUAGES = {
-    "leet": "🏴‍☠️ 1337",
-    "uwu": "🏴‍☠️ UwU",
-    "tiktok": "🏴‍☠️ TikTokKid",
-    "neofit": "🏴‍☠️ Neofit",
+    "leet": "🏴☠️ 1337",
+    "uwu": "🏴☠️ UwU",
+    "tiktok": "🏴☠️ TikTokKid",
+    "neofit": "🏴☠️ Neofit",
 }

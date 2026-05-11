@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 # ---- meta data ------ kernel ----------------------
 # author: @Hairpin00
-# description: kernel core — main Kernel class
+# description: kernel core - main Kernel class
 # --- meta data end ---------------------------------
 # 🌐 fork MCUBFB: https://github.com/Mitrichdfklwhcluio/MCUBFB
 # 🌐 github MCUB-fork: https://github.com/hairpin01/MCUB-fork
@@ -23,7 +23,7 @@ class Kernel(
     KernelPipelineMixin,
     KernelLifecycleMixin,
 ):
-    """MCUB kernel — orchestrates clients, modules, commands and scheduler.
+    """MCUB kernel - orchestrates clients, modules, commands and scheduler.
 
     This is a thin wrapper class that combines four mixins:
     - KernelCoreMixin: initialization, config, registries, utilities

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -255,7 +255,7 @@ class ModuleLoaderMixin:
         if nested_author:
             value = nested_author.group(1).strip()
 
-        value = re.sub(r"^\s*(?:port|порт)\s*:\s*", "", value, flags=re.IGNORECASE)
+        value = re.sub(r"^\s*(?:port|пopт)\s*:\s*", "", value, flags=re.IGNORECASE)
         return value.strip() or None
 
     def _parse_header_description(self, raw_value: str) -> tuple[str, dict[str, str]]:
@@ -264,8 +264,8 @@ class ModuleLoaderMixin:
             return "No description", {}
 
         # Supports patterns like:
-        # "ru: Описание / en: Description"
-        # "en: Description | ru: Описание"
+        # "ru: Oпиcaниe / en: Description"
+        # "en: Description | ru: Oпиcaниe"
         i18n_matches = re.findall(
             r"(?:^|\s*[|/]\s*)(ru|en)\s*:\s*(.*?)(?=\s*[|/]\s*(?:ru|en)\s*:|$)",
             value,

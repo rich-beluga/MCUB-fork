@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin00
+# Copyright (c) 2026 Шмэлькa | @hairpin00
 
 from collections.abc import Callable
 from typing import Any
@@ -21,7 +21,7 @@ def command(
         from core.lib.loader.module_base import ModuleBase, command
 
         class MyModule(ModuleBase):
-            @command("hello", doc_ru="привет", doc_en="hello")
+            @command("hello", doc_ru="пpивeт", doc_en="hello")
             async def cmd_hello(self, event):
                 await event.edit("Hello!")
     """
@@ -369,7 +369,7 @@ def bot_command(
         from core.lib.loader.module_base import ModuleBase, bot_command
 
         class MyModule(ModuleBase):
-            @bot_command("start", doc_ru="старт", doc_en="start")
+            @bot_command("start", doc_ru="cтapт", doc_en="start")
             async def cmd_start(self, event):
                 await event.answer("Hello from bot!")
     """

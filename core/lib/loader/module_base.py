@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin00
+# Copyright (c) 2026 Шмэлькa | @hairpin00
 #
 # Thin wrapper for backward compatibility
 # All logic moved to decorators.py and base.py

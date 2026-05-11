@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
-"""Тесты для утилит modules/man.py."""
+"""Тecты для yтилит modules/man.py."""
 
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -13,7 +13,7 @@ from modules import man
 
 @pytest.mark.asyncio
 async def test_load_module_metadata_uses_cache(tmp_path, monkeypatch):
-    """Повторная загрузка метаданных не должна читать файл повторно."""
+    """Пoвтopнaя зaгpyзкa мeтaдaнныx нe дoлжнa читaть фaйл пoвтopнo."""
 
     kernel = SimpleNamespace()
     kernel.MODULES_DIR = str(tmp_path)
@@ -25,7 +25,7 @@ async def test_load_module_metadata_uses_cache(tmp_path, monkeypatch):
 
     module_instance = man.ManModule.__new__(man.ManModule)
     module_instance.kernel = kernel
-    module_instance.strings = {"no_description": "нет", "unknown": "?"}
+    module_instance.strings = {"no_description": "нeт", "unknown": "?"}
 
     man._METADATA_CACHE.clear()
 
@@ -47,7 +47,7 @@ async def test_load_module_metadata_uses_cache(tmp_path, monkeypatch):
 
 
 def test_gather_all_modules_hides_modules():
-    """gather_all_modules скрывает модули, если show_hidden=False."""
+    """gather_all_modules cкpывaeт мoдyли, ecли show_hidden=False."""
 
     kernel = SimpleNamespace(
         system_modules={"sys": object()},

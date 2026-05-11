@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -647,7 +647,7 @@ class InlineHandlers:
         self._form_counter += 1
         form_id = self._make_form_id()
 
-        # Keep the ttl around so we can expire ad‑hoc callbacks attached to buttons
+        # Keep the ttl around so we can expire ad-hoc callbacks attached to buttons
         self._current_form_ttl = ttl
         self._cleanup_inline_callback_map()
 
@@ -1075,7 +1075,7 @@ class InlineHandlers:
         return None
 
     def _parse_json_buttons(self, json_str):
-        """Парсит JSON строку с описанием кнопок."""
+        """Пapcит JSON cтpoкy c oпиcaниeм кнoпoк."""
         try:
             data = json.loads(json_str)
             markup = []
@@ -1111,7 +1111,7 @@ class InlineHandlers:
             return markup
         except Exception as e:
             # json.JSONDecodeError is a subclass of ValueError which is a
-            # subclass of Exception — no need to list it separately
+            # subclass of Exception - no need to list it separately
             self.kernel.logger.warning(f"{self.lang['json_parsing_error']}: {e}")
             return []
 
@@ -1207,7 +1207,7 @@ class InlineHandlers:
             result = await self._inline_manager.is_allowed(user_id)
             return result
         except (ValueError, TypeError) as e:
-            self.kernel.logger.error(f"Ошибка в check_admin: {e}")
+            self.kernel.logger.error(f"Oшибкa в check_admin: {e}")
             return False
 
     async def register_handlers(self):
@@ -1289,7 +1289,7 @@ class InlineHandlers:
                 for pattern, handler in self.kernel.inline_handlers.items():
                     if len(results) >= 50:
                         break
-                    docstring = getattr(handler, "__doc__", None) or "команда"
+                    docstring = getattr(handler, "__doc__", None) or "кoмaндa"
                     cmd_text = (
                         f"{self.EMOJI_TELESCOPE} <b>{self.lang['command']}:</b>"
                         f" <code>{html.escape(pattern)}</code>\n\n"
@@ -1310,7 +1310,7 @@ class InlineHandlers:
                             buttons=[
                                 [
                                     Button.switch_inline(
-                                        f"🏄‍♀️ {self.lang['execute']}: {pattern}",
+                                        f"🏄♀️ {self.lang['execute']}: {pattern}",
                                         query=pattern,
                                         same_peer=True,
                                     )

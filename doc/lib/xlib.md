@@ -42,7 +42,7 @@ self.xlib.format_size(1048576)
 # -> "1 MB"
 
 self.xlib.format_size(1048576, "ru")
-# -> "1 МБ"
+# -> "1 MБ"
 ```
 
 ### `format_num(value, sep=" ")`
@@ -69,7 +69,7 @@ self.xlib.format_duration(3661, short=True)
 # -> "1h 1m 1s"
 
 self.xlib.format_duration(3661, locale="ru")
-# -> "1 час 1 минута 1 секунда"
+# -> "1 чac 1 минyтa 1 ceкyндa"
 ```
 
 ### `format_date(timestamp, fmt="%d %b %Y", locale="en")`
@@ -84,7 +84,7 @@ self.xlib.format_date(1234567890, "%d %B %Y")
 # -> "14 February 2009"
 
 self.xlib.format_date(1234567890, "%d %b %Y", "ru")
-# -> "14 фев 2009"
+# -> "14 фeв 2009"
 ```
 
 ### `format_delta(timestamp, locale="en", short=False)`
@@ -96,7 +96,7 @@ self.xlib.format_delta(time.time() - 300)
 # -> "5 minutes ago"
 
 self.xlib.format_delta(time.time() - 300, "ru")
-# -> "5 мин назад"
+# -> "5 мин нaзaд"
 ```
 
 ### `format_percent(value, total, decimals=1)`
@@ -138,14 +138,14 @@ self.xlib.truncate("hello world", 8)
 Pluralize word based on number (Russian style).
 
 ```python
-self.xlib.plural(1, "яблоко", "яблока", "яблок")
-# -> "яблоко"
+self.xlib.plural(1, "яблoкo", "яблoкa", "яблoк")
+# -> "яблoкo"
 
-self.xlib.plural(2, "яблоко", "яблока", "яблок")
-# -> "яблока"
+self.xlib.plural(2, "яблoкo", "яблoкa", "яблoк")
+# -> "яблoкa"
 
-self.xlib.plural(5, "яблоко", "яблока", "яблок")
-# -> "яблок"
+self.xlib.plural(5, "яблoкo", "яблoкa", "яблoк")
+# -> "яблoк"
 ```
 
 ### `num_word(n, one, few, many)`
@@ -299,7 +299,7 @@ class MyModule(ModuleBase):
         size = self.xlib.format_size(1024 * 1024)
         await event.respond(
             f"Size: {size}\n"
-            f"Plural: {self.xlib.plural(5, 'файл', 'файла', 'файлов')}",
+            f"Plural: {self.xlib.plural(5, 'фaйл', 'фaйлa', 'фaйлoв')}",
             buttons=self.xlib.grid([
                 self.xlib.button("Click", data="test:click"),
                 self.xlib.button("Link", url="https://example.com"),
@@ -318,8 +318,8 @@ Most functions support locale parameter:
 
 ```python
 self.xlib.format_size(1024, "ru")  # "1 КБ"
-self.xlib.format_duration(3600, locale="ru")  # "1 час"
-self.xlib.format_delta(time.time() - 300, "ru")  # "5 мин назад"
+self.xlib.format_duration(3600, locale="ru")  # "1 чac"
+self.xlib.format_delta(time.time() - 300, "ru")  # "5 мин нaзaд"
 ```
 
 ---

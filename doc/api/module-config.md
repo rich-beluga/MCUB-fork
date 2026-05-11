@@ -6,21 +6,21 @@ MCUB provides two ways to configure modules: a simple dict-based API and a struc
 
 ## Simple Dict API
 
-`kernel.get_module_config(module_name, default=None)` — Retrieve the full config dict for a module.
+`kernel.get_module_config(module_name, default=None)` - Retrieve the full config dict for a module.
 
-`kernel.save_module_config(module_name, config_data)` — Save the full config dict for a module.
+`kernel.save_module_config(module_name, config_data)` - Save the full config dict for a module.
 
-`kernel.get_module_config_key(module_name, key, default=None)` — Retrieve a single key from the module config.
+`kernel.get_module_config_key(module_name, key, default=None)` - Retrieve a single key from the module config.
 
-`kernel.set_module_config_key(module_name, key, value)` — Set a single key in the module config without overwriting other keys.
+`kernel.set_module_config_key(module_name, key, value)` - Set a single key in the module config without overwriting other keys.
 
-`kernel.delete_module_config_key(module_name, key)` — Remove a single key from the module config.
+`kernel.delete_module_config_key(module_name, key)` - Remove a single key from the module config.
 
-`kernel.update_module_config(module_name, updates)` — Merge a dict of updates into the module config (shallow merge).
+`kernel.update_module_config(module_name, updates)` - Merge a dict of updates into the module config (shallow merge).
 
-`kernel.delete_module_config(module_name)` — Delete the entire config for a module.
+`kernel.delete_module_config(module_name)` - Delete the entire config for a module.
 
-`kernel.store_module_config_schema(module_name, config)` — **REQUIRED for UI!** Store a live ModuleConfig schema for the UI.
+`kernel.store_module_config_schema(module_name, config)` - **REQUIRED for UI!** Store a live ModuleConfig schema for the UI.
 
 ---
 
@@ -99,9 +99,9 @@ ConfigValue(
 
 ### Important Notes
 
-1. **Always call `config.to_dict()` before saving** — this adds the `__mcub_config__` marker
-2. **Define defaults twice** — in `ConfigValue` and in the dict for `get_module_config`
-3. **`kernel.store_module_config_schema()` is REQUIRED** — without it, Choice fields won't have inline selection buttons
-4. **Use `get_config()` helper for live reading** — always read from live config, never cache values
-5. **Use Choice instead of String for enums** — provides dropdown UI
-6. **Don't use typing.List for lists** — use String with JSON
+1. **Always call `config.to_dict()` before saving** - this adds the `__mcub_config__` marker
+2. **Define defaults twice** - in `ConfigValue` and in the dict for `get_module_config`
+3. **`kernel.store_module_config_schema()` is REQUIRED** - without it, Choice fields won't have inline selection buttons
+4. **Use `get_config()` helper for live reading** - always read from live config, never cache values
+5. **Use Choice instead of String for enums** - provides dropdown UI
+6. **Don't use typing.List for lists** - use String with JSON

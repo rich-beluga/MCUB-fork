@@ -61,7 +61,7 @@ Controls which kernel versions the module is compatible with.
 | `kernel max v{version}` | Maximum kernel version supported |
 
 > [!NOTE]
-> For `min`/`max` version you can use `[__lastest__]` — the kernel will resolve it to the latest available version.
+> For `min`/`max` version you can use `[__lastest__]` - the kernel will resolve it to the latest available version.
 
 **Multiple flags** can be combined:
 ```python
@@ -87,14 +87,14 @@ async def command_handler(event):
 ```
 
 > [!TIP]
-> Keep command descriptions to **one line** — concise and lowercase.
+> Keep command descriptions to **one line** - concise and lowercase.
 
 ### 2. `doc` parameter (dict with multiple languages)
 
 ```python
 @kernel.register.command('ping', doc={
     'en': 'check bot latency',
-    'ru': 'проверить задержку бота'
+    'ru': 'пpoвepить зaдepжкy бoтa'
 })
 async def ping(event):
     await event.edit('Pong!')
@@ -103,7 +103,7 @@ async def ping(event):
 ### 3. `doc_en` / `doc_ru` parameters
 
 ```python
-@kernel.register.command('hello', doc_en='greet user', doc_ru='поприветствовать пользователя')
+@kernel.register.command('hello', doc_en='greet user', doc_ru='пoпpивeтcтвoвaть пoльзoвaтeля')
 async def hello(event):
     await event.edit('Hello!')
 ```
@@ -131,7 +131,7 @@ def register(kernel):
     async def untrust_user(event):
         ...
 
-    @kernel.register.command('ping', doc={'en': 'check bot latency', 'ru': 'проверить задержку'})
+    @kernel.register.command('ping', doc={'en': 'check bot latency', 'ru': 'пpoвepить зaдepжкy'})
     async def ping(event):
         await event.edit('Pong!')
 ```
@@ -146,7 +146,7 @@ Only `ru` and `en` are supported in the UI (defined in settings module):
 | `en` | English |
 
 > [!TIP]
-> Keep command descriptions to **one line** — concise and lowercase.
+> Keep command descriptions to **one line** - concise and lowercase.
 
 **Full example:**
 ```python

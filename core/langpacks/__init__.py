@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 """Language packs management for MCUB."""
 
@@ -77,7 +77,7 @@ def get_langpacks(locale: str | None = None) -> dict[str, dict[str, Any]]:
                     if isinstance(value, (str, dict)):
                         LANGPACKS[locale_name].setdefault(module_name, {})[key] = value
             elif isinstance(strings, str):
-                # Top-level string metadata, e.g. "lang: ru" — base language for fallback.
+                # Top-level string metadata, e.g. "lang: ru" - base language for fallback.
                 # Stored directly on the locale dict so get_module_strings and
                 # get_module_commands can resolve the correct fallback chain.
                 LANGPACKS[locale_name][module_name] = strings  # type: ignore[assignment]

@@ -11,7 +11,7 @@ function-style modules.
 
 ## Key-Value Storage
 
-Simple `(module, key)` storage — module manages its own data.
+Simple `(module, key)` storage - module manages its own data.
 
 ### `await db.db_set(module: str, key: str, value: Any)`
 

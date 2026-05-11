@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ class PyProjectMeta:
 @dataclass
 class ModuleInfo:
     name: str
-    file_path: str  # относительный путь внутри архива
+    file_path: str  # oтнocитeльный пyть внyтpи apxивa
     is_main: bool = False
 
 

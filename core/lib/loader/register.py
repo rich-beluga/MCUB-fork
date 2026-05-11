@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 # author: @Hairpin00
 # version: 1.0.3
@@ -288,7 +288,7 @@ class Register:
         Register a Telegram event handler tracked by the kernel.
 
         Handlers are stored in ``module.register.__event_handlers__`` and
-        removed automatically when the module is unloaded — no zombie
+        removed automatically when the module is unloaded - no zombie
         handlers left behind after ``um`` or ``reload``.
 
         Args:
@@ -359,7 +359,7 @@ class Register:
         if _key in _BOT_ONLY_EVENTS and not bot_client:
             self.kernel.logger.warning(
                 f"[{_mod_name}] register.event('{event_type}') called without "
-                "bot_client=True — InlineQuery / CallbackQuery events are delivered "
+                "bot_client=True - InlineQuery / CallbackQuery events are delivered "
                 "only to bot accounts, not to userbots. "
                 "The handler will be registered on the userbot client but will "
                 "likely never fire. Add bot_client=True to fix this."
@@ -370,7 +370,7 @@ class Register:
             if not _has_filter:
                 raise ValueError(
                     f"[{_mod_name}] Refusing to register '{event_type}' event "
-                    "handler without a pattern/data filter — it would fire on "
+                    "handler without a pattern/data filter - it would fire on "
                     "EVERY incoming update. "
                     "Add pattern=r'...' (or data=... for callbackquery)."
                 )
@@ -442,7 +442,7 @@ class Register:
         Args:
             pattern: Command name. Regex anchors and the prefix are
                      stripped automatically.
-            alias:   str or list[str] — alternative trigger names.
+            alias:   str or list[str] - alternative trigger names.
             more:    Arbitrary metadata stored in kernel.command_metadata.
 
         Example:
@@ -624,7 +624,7 @@ class Register:
 
         Watchers are called for every new message (in/out) and cleaned up
         automatically on module unload. Filter events declaratively with
-        tag kwargs — no ``if`` boilerplate inside the handler.
+        tag kwargs - no ``if`` boilerplate inside the handler.
 
         Args:
             bot_client: If True, register on bot_client instead of client.
@@ -658,7 +658,7 @@ class Register:
             >>> async def bot_watcher(event):
             >>>     ...
 
-            >>> # No filters — fires on every message:
+            >>> # No filters - fires on every message:
             >>> @kernel.register.watcher
             >>> async def all_messages(event):
             >>>     ...
@@ -828,7 +828,7 @@ class Register:
         Declare a managed background loop on the module.
 
         The loop is started automatically after the module loads (when
-        ``autostart=True``) and stopped on unload — no ``on_load`` /
+        ``autostart=True``) and stopped on unload - no ``on_load`` /
         ``uninstall`` boilerplate needed.
 
         The decorated function receives the kernel as its only argument (or
@@ -842,7 +842,7 @@ class Register:
                 inspect.getmodule, but can be overridden for class-style).
 
         Returns:
-            InfiniteLoop — can be used for manual ``start()`` / ``stop()``.
+            InfiniteLoop - can be used for manual ``start()`` / ``stop()``.
 
         Example:
             >>> @kernel.register.loop(interval=300)
@@ -926,7 +926,7 @@ class Register:
         """
         Register a callback invoked **only the first time** the module is installed.
 
-        Unlike ``on_load``, this is NOT called on ``reload`` — only when the
+        Unlike ``on_load``, this is NOT called on ``reload`` - only when the
         module is freshly installed via ``dlm`` / ``loadera``. The kernel stores
         a persistent flag in the module config so subsequent loads skip it.
 

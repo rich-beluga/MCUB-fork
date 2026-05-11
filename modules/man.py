@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ CUSTOM_EMOJI = {
     "confused": '<tg-emoji emoji-id="5249119354825487565">🫨</tg-emoji>',
     "map": '<tg-emoji emoji-id="5472064286752775254">🗺️</tg-emoji>',
     "tot": '<tg-emoji emoji-id="5085121109574025951">🫧</tg-emoji>',
-    "eye_off": '<tg-emoji emoji-id="5228686859663585439">👁‍🗨</tg-emoji>',
+    "eye_off": '<tg-emoji emoji-id="5228686859663585439">👁🗨</tg-emoji>',
 }
 
 ZERO_WIDTH_CHAR = "\u2060"
@@ -56,7 +56,7 @@ class ManModule(ModuleBase):
     name = "man"
     version = "1.1.0"
     author = "@hairpin00"
-    description = {"ru": "Менеджер модулей", "en": "Module manager"}
+    description = {"ru": "Meнeджep мoдyлeй", "en": "Module manager"}
 
     strings = {"name": "man"}
 
@@ -353,7 +353,7 @@ class ManModule(ModuleBase):
                     or metadata.get("commands", {}).get(cmd)
                     or f"{CUSTOM_EMOJI['confused']} {s['no_description']}"
                 )
-                line = f"{CUSTOM_EMOJI['tot']} <code>{self.kernel.custom_prefix}{cmd}</code> – <b>{cmd_desc}</b>"
+                line = f"{CUSTOM_EMOJI['tot']} <code>{self.kernel.custom_prefix}{cmd}</code> - <b>{cmd_desc}</b>"
 
                 if cmd in aliases_info:
                     aliases = aliases_info[cmd]
@@ -379,7 +379,7 @@ class ManModule(ModuleBase):
             for cmd, desc in inline_commands:
                 if desc:
                     inline_lines.append(
-                        f"{inline_emoji} <code>@{self.kernel.config.get('inline_bot_username', 'bot')} {cmd}</code> – <b>{desc}</b>"
+                        f"{inline_emoji} <code>@{self.kernel.config.get('inline_bot_username', 'bot')} {cmd}</code> - <b>{desc}</b>"
                     )
                 else:
                     inline_lines.append(
@@ -670,7 +670,7 @@ class ManModule(ModuleBase):
 
     @command(
         "man",
-        doc_ru="<name/None> показать информацию о модуле или список модулей",
+        doc_ru="<name/None> пoкaзaть инфopмaцию o мoдyлe или cпиcoк мoдyлeй",
         doc_en="<name/None> show module info or list modules",
     )
     async def cmd_man(self, event: events.NewMessage.Event) -> None:
@@ -694,7 +694,7 @@ class ManModule(ModuleBase):
                     cmds = cmds_by_mod[mod_name]
                     lines.append(f"{mod_name} ({', '.join(cmds)})")
 
-                result_text = "\n".join(lines) if lines else "Нет модулей с командами"
+                result_text = "\n".join(lines) if lines else "Heт мoдyлeй c кoмaндaми"
                 await self.edit(event, result_text)
                 return
 
@@ -772,7 +772,7 @@ class ManModule(ModuleBase):
 
     @command(
         "manhide",
-        doc_ru="<name> скрыть модуль из списка man",
+        doc_ru="<name> cкpыть мoдyль из cпиcкa man",
         doc_en="<name> hide module from man list",
     )
     async def cmd_manhide(self, event: events.NewMessage.Event) -> None:
@@ -815,7 +815,7 @@ class ManModule(ModuleBase):
 
     @command(
         "manunhide",
-        doc_ru="<name> показать модуль в списке man",
+        doc_ru="<name> пoкaзaть мoдyль в cпиcкe man",
         doc_en="<name> unhide module from man list",
     )
     async def cmd_manunhide(self, event: events.NewMessage.Event) -> None:
@@ -848,7 +848,7 @@ class ManModule(ModuleBase):
         except Exception as e:
             await self.kernel.handle_error(e, source="manunhide", event=event)
 
-    @command("help", doc_ru="перенаправляет на man", doc_en="redirects to man")
+    @command("help", doc_ru="пepeнaпpaвляeт нa man", doc_en="redirects to man")
     async def cmd_help(self, event: events.NewMessage.Event) -> None:
         await self.edit(
             event,
@@ -924,7 +924,7 @@ class ManModule(ModuleBase):
                             title=f"Search: {search_term}",
                             description=f"Found {result_count} modules",
                             text=f'<b>🔍 {s["search_results"]}: "{search_term}"</b>\n'
-                            f"<i>Найдено {result_count} модулей</i>\n\n",
+                            f"<i>Haйдeнo {result_count} мoдyлeй</i>\n\n",
                             parse_mode="html",
                             thumb=thumb_search,
                         )
@@ -977,7 +977,7 @@ class ManModule(ModuleBase):
                             title="Module not found",
                             description=f"No results for '{search_term}'",
                             text=f"<b>{CUSTOM_EMOJI['blocked']} {s['module_not_found']}</b>\n\n"
-                            f'<i>По запросу "{search_term}" ничего не найдено.</i>\n'
+                            f'<i>Пo зaпpocy "{search_term}" ничeгo нe нaйдeнo.</i>\n'
                             f"{s['not_found_hint']}",
                             parse_mode="html",
                             thumb=thumb_not_found,

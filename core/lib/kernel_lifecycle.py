@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 # ---- meta data ------ kernel_lifecycle -----------
 # author: @Hairpin00
 # description: Run, shutdown, restart, command processing
@@ -24,7 +24,7 @@ from core.lib.utils.logger import KernelLogger, setup_telegram_logging
 
 
 class KernelLifecycleMixin:
-    """Kernel lifecycle mixin — run, shutdown, restart, command processing."""
+    """Kernel lifecycle mixin - run, shutdown, restart, command processing."""
 
     async def run(self) -> None:
         """Setup, connect, load modules, and run until disconnected."""

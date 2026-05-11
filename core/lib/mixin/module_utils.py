@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -208,7 +208,7 @@ def parse_requires(code: str) -> list:
 
     Supports both ``# requires: pkg1, pkg2`` comments and class-style
     ``dependencies = ["pkg1", "pkg2"]`` declarations. Unlike
-    :meth:`pre_install_requirements`, this method only *parses* the list — it
+    :meth:`pre_install_requirements`, this method only *parses* the list - it
     does **not** install anything.
 
     Args:

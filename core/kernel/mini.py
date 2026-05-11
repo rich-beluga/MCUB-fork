@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
 # ---- meta data ------ kernel ----------------------
 # author: @Hairpin00
-# description: mini kernel — lightweight build on top of standard
+# description: mini kernel - lightweight build on top of standard
 # --- meta data end ---------------------------------
 # 🌐 fork MCUBFB: https://github.com/Mitrichdfklwhcluio/MCUBFB
 # 🌐 github MCUB-fork: https://github.com/hairpin01/MCUB-fork
@@ -219,7 +219,7 @@ class Kernel(_StandardKernel):
     async def _handle_restart_notification(
         self, modules_start: float, modules_end: float
     ) -> None:
-        """Post-restart notification — same format as standard kernel.
+        """Post-restart notification - same format as standard kernel.
 
         The restart.tmp file contains:  chat_id,msg_id,timestamp[,thread_id]
         """

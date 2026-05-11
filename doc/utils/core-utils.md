@@ -33,8 +33,8 @@ Use placeholders when a module config contains user-defined templates (for examp
 Decorator for module methods that provide placeholder values at render time.
 
 **Parameters:**
-- `name` — placeholder key used in templates (for `{name}`)
-- `description` — optional human-readable description for docs/UI
+- `name` - placeholder key used in templates (for `{name}`)
+- `description` - optional human-readable description for docs/UI
 
 **Returns:** Decorated callable that can be auto-registered for module scope.
 
@@ -52,8 +52,8 @@ async def _placeholder_now_iso(self, data):
 Register all methods decorated with `@utils.placeholders(...)` for a module scope.
 
 **Parameters:**
-- `scope` — module scope name (usually `self.name`)
-- `owner` — module instance containing decorated methods
+- `scope` - module scope name (usually `self.name`)
+- `owner` - module instance containing decorated methods
 
 ```python
 async def on_load(self):
@@ -74,10 +74,10 @@ async def on_unload(self):
 Render a template string with placeholders.
 
 **Parameters:**
-- `scope` — module scope name
-- `template` — source template (for example: `"Ping: {ping_time} ms"`)
-- `data` — dict with static values for formatting
-- `strict` — if `True`, unknown placeholders raise; if `False`, unresolved placeholders are tolerated
+- `scope` - module scope name
+- `template` - source template (for example: `"Ping: {ping_time} ms"`)
+- `data` - dict with static values for formatting
+- `strict` - if `True`, unknown placeholders raise; if `False`, unresolved placeholders are tolerated
 
 Resolution order:
 1. Static values passed through `data` / `custom_values`.
@@ -147,7 +147,7 @@ Extract command arguments split by spaces, respecting quotes.
 3. Uses `shlex.split()` to parse arguments, handling quoted strings properly
 
 **Parameters:**
-- `event` — Message event or Message object
+- `event` - Message event or Message object
 
 **Returns:** List of string arguments
 
@@ -676,7 +676,7 @@ if HTML_PARSER_AVAILABLE:
 Return the active command prefix from an event, kernel, or module.
 
 **Parameters:**
-- `target` — Event, kernel, module, or None (defaults to ".")
+- `target` - Event, kernel, module, or None (defaults to ".")
 
 **Returns:** Command prefix string (e.g., "." or "!")
 
@@ -701,8 +701,8 @@ prefix = get_prefix()  # "."
 Return the active language from an event, kernel, or module.
 
 **Parameters:**
-- `target` — Event, kernel, module, or None
-- `default` — Fallback language (default: "ru")
+- `target` - Event, kernel, module, or None
+- `default` - Fallback language (default: "ru")
 
 **Returns:** Language code (e.g., "ru" or "en")
 

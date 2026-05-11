@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from utils.restart import restart_kernel
 
 class UpdatesMod(loader.ModuleBase):
     name = "updates"
-    description = {"ru": "Модуль обновлений", "en": "Update module"}
+    description = {"ru": "Moдyль oбнoвлeний", "en": "Update module"}
     version = "1.0.6"
     author = "@Hairpin00"
 
@@ -57,7 +57,7 @@ class UpdatesMod(loader.ModuleBase):
         )
         return mcub_emoji
 
-    @loader.command("restart", doc_en="restart userbot", doc_ru="перезапустить юзербот")
+    @loader.command("restart", doc_en="restart userbot", doc_ru="пepeзaпycтить юзepбoт")
     async def restart_handler(self, event: events.NewMessage.Event):
         thread_id = None
         if event.reply_to:
@@ -77,7 +77,7 @@ class UpdatesMod(loader.ModuleBase):
         )
 
     @loader.command(
-        "update", doc_en="update MCUB-fork from git", doc_ru="обновить MCUB-fork из git"
+        "update", doc_en="update MCUB-fork from git", doc_ru="oбнoвить MCUB-fork из git"
     )
     async def cmd_update(self, event: events.NewMessage.Event):
         msg = await event.edit("❄️")
@@ -140,7 +140,7 @@ class UpdatesMod(loader.ModuleBase):
                 parse_mode="html",
             )
 
-    @loader.command("stop", doc_en="stop userbot", doc_ru="остановить юзербот")
+    @loader.command("stop", doc_en="stop userbot", doc_ru="ocтaнoвить юзepбoт")
     async def cmd_stop(self, event: events.NewMessage.Event):
         self.kernel.shutdown_flag = True
         emoji = secrets.choice(self.emojis)
@@ -151,7 +151,7 @@ class UpdatesMod(loader.ModuleBase):
         await asyncio.sleep(1)
         await self.kernel.shutdown()
 
-    # потом переделаю ---
+    # пoтoм пepeдeлaю ---
     # async def rollback_handler(event):
     #     if not os.path.exists(kernel.BACKUP_FILE):
     #         await event.edit(strings("backup_not_found"), parse_mode="html")

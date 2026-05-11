@@ -47,7 +47,7 @@ async def trusted_handler(event):
 
 ## Decorators
 
-`kernel.register.owner(only_admin=False)` — Decorator to restrict a handler to the bot owner (admin) or trusted users.
+`kernel.register.owner(only_admin=False)` - Decorator to restrict a handler to the bot owner (admin) or trusted users.
 
 ```python
 @kernel.register.owner()
@@ -69,9 +69,9 @@ cmd_alias = kernel.register.get_command_alias('ping')
 # 'p' or None
 ```
 
-`kernel.register.get_all_aliases()` — Get all registered command aliases.
+`kernel.register.get_all_aliases()` - Get all registered command aliases.
 
-`kernel.register.get_command_alias(command)` — Get the alias for a specific command.
+`kernel.register.get_command_alias(command)` - Get the alias for a specific command.
 
 ## Command Documentation
 
@@ -81,7 +81,7 @@ You can add documentation for commands using the `doc`, `doc_en`, and `doc_ru` p
 
 ```python
 @kernel.register.command('search', doc={
-    'ru': '[модуль] найди модули',
+    'ru': '[мoдyль] нaйди мoдyли',
     'en': '[modules] search modules',
 })
 async def search_modules(event):
@@ -91,7 +91,7 @@ async def search_modules(event):
 ### Using separate parameters
 
 ```python
-@kernel.register.command('search', doc_en='[modules] search modules', doc_ru='[модуль] найди модули')
+@kernel.register.command('search', doc_en='[modules] search modules', doc_ru='[мoдyль] нaйди мoдyли')
 async def search_modules(event):
     await event.edit('Searching...')
 ```
@@ -103,7 +103,7 @@ cmd_info = kernel.register.get_command('search')
 # {
 #     'handler': <function>,
 #     'owner': 'loader',
-#     'docs': {'ru': '[модуль] найди модули', 'en': '[modules] search modules'}
+#     'docs': {'ru': '[мoдyль] нaйди мoдyли', 'en': '[modules] search modules'}
 # }
 
 # Get just docs
@@ -117,4 +117,4 @@ bot_info = kernel.register.get_use_bot()
 # {'available': True, 'connected': True, 'username': 'MCUB_bot'}
 ```
 
-`kernel.register.get_use_bot()` — Get information about inline bot usage.
+`kernel.register.get_use_bot()` - Get information about inline bot usage.

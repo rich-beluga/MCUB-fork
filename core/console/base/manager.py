@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 """
-PackageManager — the main engine of `base`.
+PackageManager - the main engine of `base`.
 
 Repository layout expected at BASE_REPO_URL:
   packages.ini                       ← one package name per line
@@ -291,7 +291,7 @@ class PackageManager:
         if cfg.src_files:
             output(kv("Source files:", ""))
             for f in cfg.src_files:
-                output(f"    {GREY}·{RESET} {f}")
+                output(f"    {GREY}.{RESET} {f}")
         if cfg.bin_file:
             output(kv("Bin file:", cfg.bin_file))
 
@@ -354,7 +354,7 @@ class PackageManager:
                 progress(file_pct, f"Downloading src/{filename}")
                 content = await self._fetch_text(f"{self.repo}/{name}/src/{filename}")
                 if content is None:
-                    output(warn(f"  ⚠ Could not download '{filename}' — skipping"))
+                    output(warn(f"  ⚠ Could not download '{filename}' - skipping"))
                     continue
                 dest = src_dir / filename
                 dest.write_text(content, encoding="utf-8")

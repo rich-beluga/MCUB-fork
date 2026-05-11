@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ class SettingsModule(ModuleBase):
     version = "1.0.5"
     author = "@hairpin00"
     description = {
-        "ru": "Модуль настроек (префикс, алиасы, язык)",
+        "ru": "Moдyль нacтpoeк (пpeфикc, aлиacы, язык)",
         "en": "Settings module (prefix, aliases, language)",
     }
 
@@ -102,7 +102,7 @@ class SettingsModule(ModuleBase):
 
     @command(
         "setprefix",
-        doc_ru="[префикс] [id/@username/reply] - изменить префикс овнера",
+        doc_ru="[пpeфикc] [id/@username/reply] - измeнить пpeфикc oвнepa",
         doc_en="[prefix] [id/@username/reply] - change owner prefix",
     )
     async def cmd_setprefix(self, event: events.NewMessage.Event) -> None:
@@ -165,7 +165,7 @@ class SettingsModule(ModuleBase):
 
     @command(
         "addalias",
-        doc_ru="[алиас]=[команда] - добавить алиас команды",
+        doc_ru="[aлиac]=[кoмaндa] - дoбaвить aлиac кoмaнды",
         doc_en="[alias]=[command] - add command alias",
     )
     async def cmd_addalias(self, event: events.NewMessage.Event) -> None:
@@ -227,7 +227,7 @@ class SettingsModule(ModuleBase):
 
     @command(
         "delalias",
-        doc_ru="[алиас] - удалить алиас команды",
+        doc_ru="[aлиac] - yдaлить aлиac кoмaнды",
         doc_en="[alias] - delete command alias",
     )
     async def cmd_delalias(self, event: events.NewMessage.Event) -> None:
@@ -266,7 +266,7 @@ class SettingsModule(ModuleBase):
 
     @command(
         "aliases",
-        doc_ru="показать все алиасы команд",
+        doc_ru="пoкaзaть вce aлиacы кoмaнд",
         doc_en="list all command aliases",
     )
     async def cmd_aliases(self, event: events.NewMessage.Event) -> None:
@@ -304,7 +304,7 @@ class SettingsModule(ModuleBase):
 
     @command(
         "lang",
-        doc_ru="[ru/en] - сменить язык юзербота",
+        doc_ru="[ru/en] - cмeнить язык юзepбoтa",
         doc_en="[ru/en] - switch userbot language",
     )
     async def cmd_lang(self, event: events.NewMessage.Event) -> None:
@@ -331,7 +331,7 @@ class SettingsModule(ModuleBase):
             button_rows = []
             row = []
             for locale in available_locales:
-                label = self.strings.get(f"btn_{locale}", f"🏴‍☠️ {locale}")
+                label = self.strings.get(f"btn_{locale}", f"🏴☠️ {locale}")
                 row.append(self.Button.inline(label, self.cb_lang, data=locale))
                 if len(row) == 2:
                     button_rows.append(row)
@@ -439,7 +439,7 @@ class SettingsModule(ModuleBase):
 
     @command(
         "cleardb",
-        doc_ru="удалить файл базы данных",
+        doc_ru="yдaлить фaйл бaзы дaнныx",
         doc_en="delete database file",
     )
     async def cmd_cleardb(self, event: events.NewMessage.Event) -> None:
@@ -447,7 +447,7 @@ class SettingsModule(ModuleBase):
 
     @command(
         "clearmodules",
-        doc_ru="удалить все пользовательские модули",
+        doc_ru="yдaлить вce пoльзoвaтeльcкиe мoдyли",
         doc_en="delete all user modules",
     )
     async def cmd_clearmodules(self, event: events.NewMessage.Event) -> None:
@@ -462,7 +462,7 @@ class SettingsModule(ModuleBase):
 
     @command(
         "clearcache",
-        doc_ru="очистить кэш ядра",
+        doc_ru="oчиcтить кэш ядpa",
         doc_en="clear kernel cache",
     )
     async def cmd_clearcache(self, event: events.NewMessage.Event) -> None:
@@ -499,7 +499,7 @@ class SettingsModule(ModuleBase):
 
     @command(
         "mcubinfo",
-        doc_ru="что такое юзербот",
+        doc_ru="чтo тaкoe юзepбoт",
         doc_en="what is a userbot",
     )
     async def cmd_mcubinfo(self, event: events.NewMessage.Event) -> None:
@@ -534,7 +534,7 @@ class SettingsModule(ModuleBase):
         else:
             await self.edit(event, self._s("piped_off"), parse_mode="html")
 
-    @command("mcub", doc_ru="Инфо о MCUB", doc_en="Info MCUB")
+    @command("mcub", doc_ru="Инфo o MCUB", doc_en="Info MCUB")
     async def cmd_mcub(self, event: events.NewMessage.Event) -> None:
         version_kernel = self.kernel.VERSION
         version_telethon = __version__

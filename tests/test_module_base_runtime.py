@@ -87,7 +87,7 @@ class TestModuleBaseRuntime:
         class StringsMod(ModuleBase):
             name = "StringsMod"
             strings = {
-                "ru": {"hello": "Привет {name}"},
+                "ru": {"hello": "Пpивeт {name}"},
                 "en": {"hello": "Hello {name}"},
             }
 

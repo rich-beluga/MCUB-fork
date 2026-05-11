@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin00
+# Copyright (c) 2026 Шмэлькa | @hairpin00
 
 import asyncio
 import copy

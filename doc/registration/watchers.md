@@ -60,9 +60,9 @@ def register(kernel):
         kernel.logger.info(f"sent in PM: {event.text}")
 
     # React to keyword
-    @kernel.register.watcher(contains="купи слона")
+    @kernel.register.watcher(contains="кyпи cлoнa")
     async def elephant(event):
-        await event.reply("А у нас есть слоны!")
+        await event.reply("A y нac ecть cлoны!")
 
     # Regex filter
     @kernel.register.watcher(regex=r"^\d{4,}$")
@@ -71,4 +71,4 @@ def register(kernel):
 ```
 
 > [!TIP]
-> Watcher errors are caught and logged automatically — a crash in one watcher never affects others.
+> Watcher errors are caught and logged automatically - a crash in one watcher never affects others.

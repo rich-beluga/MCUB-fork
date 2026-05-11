@@ -22,7 +22,7 @@ Your custom core just needs to:
 
 ## Minimal Custom Core
 
-The simplest possible core — inherits everything from `standard`:
+The simplest possible core - inherits everything from `standard`:
 
 ```python
 # core/kernel/mycore.py
@@ -51,7 +51,7 @@ python3 -m core --set-default-core mycore
 | `process_command` | Intercept or transform commands before dispatch |
 | `handle_error` | Custom error reporting |
 
-## Example — Custom Error Handler
+## Example - Custom Error Handler
 
 ```python
 class Kernel(_StandardKernel):

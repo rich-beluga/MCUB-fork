@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 """
 Tests for module loader
@@ -1085,7 +1085,7 @@ class TestClassStyleModule:
         class TestMod(ModuleBase):
             name = "Test"
 
-            @command("hello", alias=["hi", "h"], doc_ru="привет", doc_en="hello")
+            @command("hello", alias=["hi", "h"], doc_ru="пpивeт", doc_en="hello")
             async def hello(self, event):
                 pass
 
@@ -1097,7 +1097,7 @@ class TestClassStyleModule:
         kernel.register.command.assert_called_once()
         call_kwargs = kernel.register.command.call_args[1]
         assert call_kwargs["alias"] == ["hi", "h"]
-        assert call_kwargs["doc_ru"] == "привет"
+        assert call_kwargs["doc_ru"] == "пpивeт"
         assert call_kwargs["doc_en"] == "hello"
 
 
@@ -1222,7 +1222,7 @@ class TestKernelStyleMetadata:
 # description: Kernel style test module
 
 def register(kernel):
-    @kernel.register.command("term", doc_en="run shell", doc_ru="запустить shell")
+    @kernel.register.command("term", doc_en="run shell", doc_ru="зaпycтить shell")
     async def term_handler(event):
         pass
 """
@@ -1233,7 +1233,7 @@ def register(kernel):
         assert metadata["author"] == "@Dev"
         assert metadata["version"] == "3.2.1"
         assert metadata["description"] == "Kernel style test module"
-        assert metadata["commands"]["term"] == "запустить shell"
+        assert metadata["commands"]["term"] == "зaпycтить shell"
 
     @pytest.mark.asyncio
     async def test_get_module_metadata_header_author_with_port_prefix(self):
@@ -1275,13 +1275,13 @@ def register(kernel):
 
         code = """
 # author: @Dev
-# description: ru: Описание модуля / en: Module description
+# description: ru: Oпиcaниe мoдyля / en: Module description
 """
 
         metadata = await loader.get_module_metadata(code)
-        assert metadata["description"] == "Описание модуля"
+        assert metadata["description"] == "Oпиcaниe мoдyля"
         assert metadata["description_i18n"] == {
-            "ru": "Описание модуля",
+            "ru": "Oпиcaниe мoдyля",
             "en": "Module description",
         }
 
@@ -1294,13 +1294,13 @@ def register(kernel):
 
         code = """
 def register(kernel):
-    @kernel.register.command("term", doc={"en": "run shell", "ru": "запустить shell"})
+    @kernel.register.command("term", doc={"en": "run shell", "ru": "зaпycтить shell"})
     async def term_handler(event):
         pass
 """
 
         metadata = await loader.get_module_metadata(code)
-        assert metadata["commands"]["term"] == "запустить shell"
+        assert metadata["commands"]["term"] == "зaпycтить shell"
 
     @pytest.mark.asyncio
     async def test_get_module_metadata_hikka_style_class_docstring(self):

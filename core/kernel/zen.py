@@ -1,14 +1,14 @@
 """
-Zen Kernel — simple is better than complex.
+Zen Kernel - simple is better than complex.
 Flat is better than nested. Readability counts.
 """
 
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 # ---- meta data ------ kernel ----------------------
 # author: @Hairpin00
-# description: kernel core — zen edition
+# description: kernel core - zen edition
 # --- meta data end ---------------------------------
 # 🌐 fork MCUBFB: https://github.com/Mitrichdfklwhcluio/MCUBFB
 # 🌐 github MCUB-fork: https://github.com/hairpin01/MCUB-fork
@@ -154,7 +154,7 @@ def _validate_regex(pattern: str) -> tuple[bool, str]:
 
 
 class Kernel:
-    """MCUB kernel — zen edition.
+    """MCUB kernel - zen edition.
 
     Orchestrates clients, modules, commands and scheduler.
     Simple is better than complex. Readability counts.
@@ -861,7 +861,7 @@ class Kernel:
 
         if self.current_loading_module is None:
             raise ValueError(
-                "no loading module context — call set_loading_module first"
+                "no loading module context - call set_loading_module first"
             )
 
         if cmd in self.command_handlers:
@@ -1298,7 +1298,7 @@ class Kernel:
 
     async def run(self) -> None:
         """Boot sequence: config → scheduler → client → modules → event loop."""
-        no_web = not getattr(self, "web_enabled", True)  # True если --no-web
+        no_web = not getattr(self, "web_enabled", True)  # True ecли --no-web
         _true = install_uvloop()
         if not _true:
             self.logger.info("failed install uvloop")

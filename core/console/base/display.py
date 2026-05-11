@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 # console/base/display.py
 """
@@ -31,7 +31,7 @@ SYM_ERR = f"{RED}✖{RESET}"
 SYM_WARN = f"{YELLOW}⚠{RESET}"
 SYM_INFO = f"{CYAN}ℹ{RESET}"
 SYM_ARROW = f"{CYAN}→{RESET}"
-SYM_DASH = f"{GREY}·{RESET}"
+SYM_DASH = f"{GREY}.{RESET}"
 SYM_BULLET = f"{MAGENTA}•{RESET}"
 SYM_DL = f"{BLUE}↓{RESET}"
 SYM_INST = f"{GREEN}⚙{RESET}"

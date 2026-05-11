@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -1373,16 +1373,16 @@ def _ensure_fake_package() -> str:
     translations._translations_mod.__name__ = f"{_FAKE_PKG_NAME}.translations"
     translations._translations_mod.SUPPORTED_LANGUAGES = {
         "en": "🇬🇧 English",
-        "ru": "🇷🇺 Русский",
-        "ua": "🇺🇦 Український",
+        "ru": "🇷🇺 Pyccкий",
+        "ua": "🇺🇦 Укpaїнcький",
         "de": "🇩🇪 Deutsch",
         "jp": "🇯🇵 日本語",
     }
     translations._translations_mod.MEME_LANGUAGES = {
-        "leet": "🏴‍☠️ 1337",
-        "uwu": "🏴‍☠️ UwU",
-        "tiktok": "🏴‍☠️ TikTokKid",
-        "neofit": "🏴‍☠️ Neofit",
+        "leet": "🏴☠️ 1337",
+        "uwu": "🏴☠️ UwU",
+        "tiktok": "🏴☠️ TikTokKid",
+        "neofit": "🏴☠️ Neofit",
     }
     translations._translations_mod.translator = _translator_stub
     translations._translations_mod.Strings = _StringsShim
@@ -1750,7 +1750,7 @@ async def load_hikka_module(
             if missing_pkg == _FAKE_PKG_NAME or missing_full.startswith(_FAKE_PKG_NAME):
                 kernel.logger.warning(
                     f"[hikka_compat] Fake package '{_FAKE_PKG_NAME}' vanished from "
-                    f"sys.modules — re-injecting and retrying"
+                    f"sys.modules - re-injecting and retrying"
                 )
                 _ensure_fake_package()
                 continue
@@ -2268,7 +2268,7 @@ async def load_hikka_module(
 
     kernel.logger.info(
         f"[hikka_compat] Loaded '{module_name}' "
-        f"({cls.__name__}) — commands: {registered_cmds}"
+        f"({cls.__name__}) - commands: {registered_cmds}"
     )
     return True, "", {"registered": registered_cmds, "conflicts": conflicts}
 

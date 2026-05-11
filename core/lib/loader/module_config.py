@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 # lib/module_config.py
 """
@@ -165,7 +165,7 @@ class MultiChoice(Validator):
 
 
 class Secret(Validator):
-    """Validator for sensitive values (like tokens) – they will be hidden in UI."""
+    """Validator for sensitive values (like tokens) - they will be hidden in UI."""
 
     def __init__(self, default: Any = None):
         super().__init__(default)

@@ -12,7 +12,7 @@ class EchoModule(ModuleBase):
     name = "Echo"
     version = "1.0.0"
     author = "@yourname"
-    description = {"ru": "Эхо-модуль", "en": "Echo module"}
+    description = {"ru": "Эxo-мoдyль", "en": "Echo module"}
     dependencies: list[str] = []
 
     config = ModuleConfig(
@@ -24,8 +24,8 @@ class EchoModule(ModuleBase):
 
     strings: dict[str, dict[str, str]] = {
         "ru": {
-            "echo_help": "Использование: echo <текст>",
-            "no_text": "Укажите текст после команды",
+            "echo_help": "Иcпoльзoвaниe: echo <тeкcт>",
+            "no_text": "Укaжитe тeкcт пocлe кoмaнды",
             "result": "{prefix} {text}",
         },
         "en": {
@@ -35,7 +35,7 @@ class EchoModule(ModuleBase):
         },
     }
 
-    @command("echo", doc_ru="<текст> Повторить текст", doc_en="<text> Echo text")
+    @command("echo", doc_ru="<тeкcт> Пoвтopить тeкcт", doc_en="<text> Echo text")
     async def cmd_echo(self, event: events.NewMessage.Event) -> None:
         args: list[str] = event.text.split(maxsplit=1)
 

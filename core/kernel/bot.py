@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -20,10 +20,10 @@ from .standard import Kernel as _StandardKernel
 
 
 class Kernel(_StandardKernel):
-    """Bot kernel — uses a bot token instead of a user account.
+    """Bot kernel - uses a bot token instead of a user account.
 
-    self.client — the bot's TelegramClient (logged in via bot token)
-    self.bot_client — alias to self.client (same object)
+    self.client - the bot's TelegramClient (logged in via bot token)
+    self.bot_client - alias to self.client (same object)
     """
 
     def __init__(self) -> None:
@@ -203,7 +203,7 @@ class Kernel(_StandardKernel):
     def should_process_command_event(self, event: Any) -> bool:
         """Process only messages sent BY the bot itself (out=True).
 
-        Nobody else's messages trigger commands — only the bot's own outgoing
+        Nobody else's messages trigger commands - only the bot's own outgoing
         messages that start with the command prefix.
         """
         msg = getattr(event, "message", event)

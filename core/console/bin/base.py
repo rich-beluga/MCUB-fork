@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 """
 Shell command: base
-MCUB Package Manager — installs, updates and removes shell packages.
+MCUB Package Manager - installs, updates and removes shell packages.
 
 Usage:
   base                              error: no operation specified

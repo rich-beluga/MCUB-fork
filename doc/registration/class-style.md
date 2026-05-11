@@ -18,14 +18,14 @@ class MyModule(ModuleBase):
     name = "MyModule"
     version = "1.0.0"
     author = "@yourname"
-    description: dict[str, str] = {"ru": "Описание", "en": "Description"}
+    description: dict[str, str] = {"ru": "Oпиcaниe", "en": "Description"}
     dependencies: list[str] = ["requests"]
 
-    @command("hello", doc_ru="Приветствие", doc_en="Say hello")
+    @command("hello", doc_ru="Пpивeтcтвиe", doc_en="Say hello")
     async def cmd_hello(self, event: events.NewMessage.Event) -> None:
         await event.edit("Hello from class-style module!")
 
-    @bot_command("start", doc_ru="Старт", doc_en="Start")
+    @bot_command("start", doc_ru="Cтapт", doc_en="Start")
     async def bot_start(self, event: events.NewMessage.Event) -> None:
         await event.reply("Hello from bot!")
 
@@ -93,7 +93,7 @@ async def cmd_ping(self, event):
 Register a command via bot account (not userbot). The decorated method receives `self` and the `event`.
 
 ```python
-@bot_command("start", doc_ru="Старт", doc_en="Start")
+@bot_command("start", doc_ru="Cтapт", doc_en="Start")
 async def cmd_start(self, event):
     await event.reply("Hello from bot!")
 ```
@@ -170,7 +170,7 @@ async def cmd_critical(self, event):
 ```
 
 **Parameters:**
-- `log_level` (str): Logging level — "error", "warning", "info" (default: "error")
+- `log_level` (str): Logging level - "error", "warning", "info" (default: "error")
 - `reraise` (bool): If True, reraise exception after logging (default: False)
 - `message` (str): Custom message template with `{exc}`, `{func}`, `{module}` placeholders
 
@@ -581,9 +581,9 @@ class MyModule(ModuleBase):
     name = "MyModule"
     strings = {
         "ru": {
-            "greet": "Привет, {name}!",
-            "bye": "Пока!",
-            "counter": "Счётчик: {count}",
+            "greet": "Пpивeт, {name}!",
+            "bye": "Пoкa!",
+            "counter": "Cчётчик: {count}",
         },
         "en": {
             "greet": "Hello, {name}!",
@@ -932,13 +932,13 @@ class CounterModule(ModuleBase):
     name = "Counter"
     version = "1.0.0"
     author = "@you"
-    description: dict[str, str] = {"ru": "Счётчик", "en": "Counter"}
+    description: dict[str, str] = {"ru": "Cчётчик", "en": "Counter"}
 
-    @command("count", doc_ru="Показать счётчик", doc_en="Show counter")
+    @command("count", doc_ru="Пoкaзaть cчётчик", doc_en="Show counter")
     async def cmd_count(self, event: events.NewMessage.Event) -> None:
         await event.edit(f"Count: {self._counter}")
 
-    @bot_command("count", doc_ru="Показать счётчик (бот)", doc_en="Show counter (бот)")
+    @bot_command("count", doc_ru="Пoкaзaть cчётчик (бoт)", doc_en="Show counter (бoт)")
     async def bot_count(self, event: events.NewMessage.Event) -> None:
         await event.reply(f"Count: {self._counter}")
 
@@ -947,7 +947,7 @@ class CounterModule(ModuleBase):
     async def cmd_admin(self, event: events.NewMessage.Event) -> None:
         await event.reply("Admin panel coming soon!")
 
-    @command("reset", doc_ru="Сбросить", doc_en="Reset counter")
+    @command("reset", doc_ru="Cбpocить", doc_en="Reset counter")
     async def cmd_reset(self, event: events.NewMessage.Event) -> None:
         self._counter = 0
         await event.edit("Counter reset!")

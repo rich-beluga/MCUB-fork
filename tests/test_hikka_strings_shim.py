@@ -13,7 +13,7 @@ def _make_module():
             "name": "Demo",
         },
         strings_ru={
-            "errors": {"no_playing": "Ничего не играет"},
+            "errors": {"no_playing": "Hичeгo нe игpaeт"},
         },
     )
 
@@ -26,7 +26,7 @@ def test_runtime_strings_shim_call_returns_raw_dict():
     val = shim("errors")
 
     assert isinstance(val, dict)
-    assert val["no_playing"] == "Ничего не играет"
+    assert val["no_playing"] == "Hичeгo нe игpaeт"
 
 
 def test_runtime_strings_shim_getitem_localizes_dict():
@@ -34,7 +34,7 @@ def test_runtime_strings_shim_getitem_localizes_dict():
     tr = SimpleNamespace(_lang="ru")
     shim = RuntimeStringsShim(mod, tr)
 
-    assert shim["errors"] == "Ничего не играет"
+    assert shim["errors"] == "Hичeгo нe игpaeт"
 
 
 def test_translat_strings_shim_call_returns_raw_dict():
@@ -45,4 +45,4 @@ def test_translat_strings_shim_call_returns_raw_dict():
     val = shim("errors")
 
     assert isinstance(val, dict)
-    assert val["no_playing"] == "Ничего не играет"
+    assert val["no_playing"] == "Hичeгo нe игpaeт"

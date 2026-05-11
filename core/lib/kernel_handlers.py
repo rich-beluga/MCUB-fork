@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 # ---- meta data ------ kernel_handlers -------------
 # author: @Hairpin00
 # description: Handler registration, middleware, modules
@@ -21,7 +21,7 @@ except ImportError:
 
 
 class KernelHandlersMixin:
-    """Kernel handlers mixin — handler registration, middleware, module management."""
+    """Kernel handlers mixin - handler registration, middleware, module management."""
 
     def dedupe_event_builders(self, reason: str = "manual") -> list[str]:
         """Remove duplicate Telethon bindings while keeping the newest one."""

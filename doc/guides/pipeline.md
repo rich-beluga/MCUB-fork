@@ -145,7 +145,7 @@ class MyModule(ModuleBase):
 
     @command(
         "reverse",
-        doc_ru="[text] перевернуть текст",
+        doc_ru="[text] пepeвepнyть тeкcт",
         doc_en="[text] reverse text",
     )
     async def cmd_reverse(self, event: events.NewMessage.Event) -> None:
@@ -172,7 +172,7 @@ class MyModule(ModuleBase):
 
     @command(
         "length",
-        doc_ru="[text] длина текста",
+        doc_ru="[text] длинa тeкcтa",
         doc_en="[text] text length",
     )
     async def cmd_length(self, event: events.NewMessage.Event) -> None:
@@ -205,16 +205,16 @@ Pipeline can be enabled/disabled in settings:
 .pipeline # Enable/Disabled pipeline (toggle command)
 ```
 
-Commands work regardless of pipeline status — they just won't receive `pipe_input` when pipeline is disabled.
+Commands work regardless of pipeline status - they just won't receive `pipe_input` when pipeline is disabled.
 
 ## Best Practices
 
-1. **Always check both `args` and `pipe_input`** — prefer args if provided, fallback to pipe_input
-2. **Check `event.piped` before formatting** — use `parse_mode="html"` only when not piped
-3. **Set `event.pipe_exit_code = 1` on errors** — stops the pipeline chain
-4. **Use `{pipe_input}` placeholder** — allows users to reference previous output in args
-5. **Set `event.no_add_args_to_input = True`** — prevents args from being added to input
-6. **Keep pipe_input on error** — allows error handling in downstream commands
+1. **Always check both `args` and `pipe_input`** - prefer args if provided, fallback to pipe_input
+2. **Check `event.piped` before formatting** - use `parse_mode="html"` only when not piped
+3. **Set `event.pipe_exit_code = 1` on errors** - stops the pipeline chain
+4. **Use `{pipe_input}` placeholder** - allows users to reference previous output in args
+5. **Set `event.no_add_args_to_input = True`** - prevents args from being added to input
+6. **Keep pipe_input on error** - allows error handling in downstream commands
 
 ## Testing Pipeline
 

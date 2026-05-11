@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 import hashlib
 import os
@@ -261,8 +261,8 @@ def lock_file(path: str) -> bool:
     Checks if already locked to avoid unnecessary syscalls.
 
     Returns:
-        True  – permissions set (or file does not exist yet).
-        False – unsupported platform or OS error.
+        True  - permissions set (or file does not exist yet).
+        False - unsupported platform or OS error.
     """
     if sys.platform == "win32":
         # Windows ACLs are not handled here

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -27,13 +27,13 @@ class EvalModule(ModuleBase):
     name = "eval"
     version = "1.0.3"
     author = "@hairpin00"
-    description = {"ru": "Выполнение Python кода", "en": "Python code execution"}
+    description = {"ru": "Выпoлнeниe Python кoдa", "en": "Python code execution"}
 
     strings = {"name": "eval"}
 
     @command(
         "py",
-        doc_ru="<код> выполнить Python код",
+        doc_ru="<кoд> выпoлнить Python кoд",
         doc_en="<code> execute Python code",
     )
     async def cmd_py(self, event: events.NewMessage.Event) -> None:

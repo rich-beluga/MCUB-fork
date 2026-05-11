@@ -127,12 +127,12 @@ kernel.cprint("Success!", kernel.Colors.GREEN)
 
 ### Kernel Version API
 
-`kernel.get_thread_id(event)` — Thread ID for topics
+`kernel.get_thread_id(event)` - Thread ID for topics
 
-`kernel.get_user_info(user_id)` — User info formatting
+`kernel.get_user_info(user_id)` - User info formatting
 
-`kernel.is_admin(user_id)` — Admin check
+`kernel.is_admin(user_id)` - Admin check
 
-`kernel.cprint(text, color='')` — Colored console output
+`kernel.cprint(text, color='')` - Colored console output
 
-`kernel.Colors` — ANSI color codes (RESET, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN)
+`kernel.Colors` - ANSI color codes (RESET, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN)

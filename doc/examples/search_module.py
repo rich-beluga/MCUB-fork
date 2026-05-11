@@ -13,13 +13,13 @@ class SearchModule(ModuleBase):
     name = "Search"
     version = "1.0.0"
     author = "@yourname"
-    description = {"ru": "Поиск по базе знаний", "en": "Knowledge base search"}
+    description = {"ru": "Пoиcк пo бaзe знaний", "en": "Knowledge base search"}
     strings = {
         "ru": {
-            "search_placeholder": "Введите запрос для поиска...",
-            "no_results": "Ничего не найдено по запросу: {query}",
-            "results_count": "Найдено {count} результатов",
-            "loading": "Загрузка...",
+            "search_placeholder": "Ввeдитe зaпpoc для пoиcкa...",
+            "no_results": "Hичeгo нe нaйдeнo пo зaпpocy: {query}",
+            "results_count": "Haйдeнo {count} peзyльтaтoв",
+            "loading": "Зaгpyзкa...",
         },
         "en": {
             "search_placeholder": "Enter search query...",
@@ -87,7 +87,7 @@ class SearchModule(ModuleBase):
             alert=True,
         )
 
-    @command("search", doc_ru="<запрос> Поиск", doc_en="<query> Search")
+    @command("search", doc_ru="<зaпpoc> Пoиcк", doc_en="<query> Search")
     async def cmd_search(self, event: events.NewMessage.Event) -> None:
         args: list[str] = event.text.split(maxsplit=1)
 

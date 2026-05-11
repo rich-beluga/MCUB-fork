@@ -208,7 +208,7 @@ utils_piped:
   b64_usage: b64 [-d] [text]
   b64_error: 'Base64 error: {err}'
   if_usage: if <pattern> [text]
-  if_no_match: No match — pipeline stopped
+  if_no_match: No match - pipeline stopped
   repeat_usage: repeat <N> ['sep'] [text]
   repeat_range: 'N must be between 1 and 100'
   fwd_no_reply: Reply to a message first
@@ -374,7 +374,7 @@ api_protection:
   analyze_eta_now: <tg-emoji emoji-id="5388785832956016892">❌</tg-emoji> <b>Already exceeded</b>
   analyze_eta_in: <code>~{seconds}</code>s
   analyze_profile_insufficient: <i>insufficient data</i>
-  mcub_not_supported: <tg-emoji emoji-id="5904692292324692386">⚠️</tg-emoji> <b>Telethon-MCUB not detected</b> — native protection unavailable
+  mcub_not_supported: <tg-emoji emoji-id="5904692292324692386">⚠️</tg-emoji> <b>Telethon-MCUB not detected</b> - native protection unavailable
   mcub_mode_set: <tg-emoji emoji-id="5253671358734281000">🛡</tg-emoji> <b>MCUB protection mode:</b> <code>{mode}</code><i>{dry}</i>
   mcub_mode_dry: "<i>(dry-run: violations logged, not blocked)</i>"
   mcub_mode_usage: <tg-emoji emoji-id="5332654441508119011">⚙️</tg-emoji> <b>Usage:</b> <code>.api_mode [off|safe|strict|custom] [dry]</code>
@@ -473,7 +473,7 @@ man:
   page_error: Error
   search_error: Search Error
   search_error_desc: An error occurred
-  module_hidden: 👁️‍🗨️ <b>Module hidden from list.</b>
+  module_hidden: 👁️🗨️ <b>Module hidden from list.</b>
   module_already_hidden: <tg-emoji emoji-id="5767151002666929821">🚫</tg-emoji> <b>Module is already hidden.</b>
   module_unhidden: ✅ <b>Module removed from hidden.</b>
   module_not_hidden: <tg-emoji emoji-id="5767151002666929821">🚫</tg-emoji> <b>This module is not hidden.</b>
@@ -583,7 +583,7 @@ settings:
     groups, automate actions and much more.</blockquote>
 
 
-    <tg-emoji emoji-id="5435957248314579621">⭐️</tg-emoji> <b>Advantages:</b> <blockquote expandable><tg-emoji emoji-id="5226945370684140473">➕</tg-emoji> <b>Full automation</b> - can set up
+    <tg-emoji emoji-id="5435957248314579621">⭐</tg-emoji> <b>Advantages:</b> <blockquote expandable><tg-emoji emoji-id="5226945370684140473">➕</tg-emoji> <b>Full automation</b> - can set up
     auto-replies, chat monitoring, channel and group management
 
     <tg-emoji emoji-id="5226945370684140473">➕</tg-emoji> <b>Unlimited capabilities</b> - access to all Telegram features, including those
@@ -672,7 +672,7 @@ loader:
   placeholders_title: Custom placeholders
   placeholders_block: "\n<blockquote expandable>🧩 <b>{title}:</b>\n<i>{placeholders}</i></blockquote>"
   no_cmd_desc: '{no_cmd} Command has no description'
-  command_line: '{crystal} <code>{prefix}{cmd}</code> – <b>{desc}</b>'
+  command_line: '{crystal} <code>{prefix}{cmd}</code> - <b>{desc}</b>'
   aliases_text: ' (Aliases: {alias_text})'
   log_aliases_found: 'Command {cmd} has aliases: {aliases}'
   log_install_error: '=X Module loading error: {error}'
@@ -846,7 +846,7 @@ loader:
   btn_back: Back
   btn_next: Next
   modules_not_mcub: '{warning} Module is not {mcub} type, [Heroku/Hikka]'
-  log_hikka_detected: =+ Hikka/Heroku module detected — loading via compat layer
+  log_hikka_detected: =+ Hikka/Heroku module detected - loading via compat layer
   hikka_no_compat: '{warning} <b>Hikka compat, not found.</b>'
   hikka_disabled: '{warning} <b>Hikka/Heroku modules support is disabled via loader
     config (loader_allow_hikka_modules).</b>'
@@ -998,10 +998,10 @@ userbot_backup:
     Encrypted</blockquote>
   wrong_password: <tg-emoji emoji-id="5388785832956016892">❌</tg-emoji> Wrong password
     or archive corrupted
-  hash_ok: <tg-emoji emoji-id="5118861066981344121">✅</tg-emoji> SHA256 matches —
+  hash_ok: <tg-emoji emoji-id="5118861066981344121">✅</tg-emoji> SHA256 matches -
     file intact
   hash_mismatch: <blockquote><tg-emoji emoji-id="5388785832956016892">❌</tg-emoji>
-    SHA256 mismatch — file corrupted!</blockquote>
+    SHA256 mismatch - file corrupted!</blockquote>
   hash_unknown: <tg-emoji emoji-id="5409235172979672859">⚠️</tg-emoji> SHA256 not
     found in signature
   cloud_ok: '<tg-emoji emoji-id="5359954476607521990">☁️</tg-emoji> {provider}: uploaded
@@ -1078,7 +1078,7 @@ trusted:
   trustlist_title: '<tg-emoji emoji-id="5332771595331077100">💙</tg-emoji> <b>Trusted users:</b>'
   ownerprefix_usage: '<tg-emoji emoji-id="5409117246062625941">⚙️</tg-emoji> Usage: <code>.ownerprefix</code> [id/@username] or reply'
   ownerprefix_list_title: '<tg-emoji emoji-id="5332771595331077100">💙</tg-emoji> <b>Owners and prefixes:</b>'
-  ownerprefix_list_item: '• {user} (<code>{user_id}</code>) — <code>{prefix}</code> <em>({source})</em>'
+  ownerprefix_list_item: '• {user} (<code>{user_id}</code>) - <code>{prefix}</code> <em>({source})</em>'
   ownerprefix_one: '🔎 <b>Owner prefix:</b> {user} (<code>{user_id}</code>)\n• <b>Prefix:</b> <code>{prefix}</code>\n• <b>Source:</b> <em>{source}</em>'
   ownerprefix_source_personal: personal
   ownerprefix_source_fallback: admin fallback

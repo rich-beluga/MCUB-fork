@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -1921,7 +1921,7 @@ class InlineProxy:
         current_page = max(1, min(total_pages, current_page))
         buttons = []
         for number in range(1, total_pages + 1):
-            text = f"· {number} ·" if number == current_page else str(number)
+            text = f". {number} ." if number == current_page else str(number)
             buttons.append(
                 {
                     "text": text,

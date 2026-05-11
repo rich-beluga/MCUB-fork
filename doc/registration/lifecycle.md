@@ -8,7 +8,7 @@ This page describes the function-style `kernel.register` API. In class-style mod
 
 ## `@kernel.register.on_load()`
 
-Called after the module is fully registered — on initial startup and on every `reload`.
+Called after the module is fully registered - on initial startup and on every `reload`.
 
 ```python
 @kernel.register.on_load()
@@ -30,7 +30,7 @@ async def first_time(kernel):
 
 ## `@kernel.register.uninstall()`
 
-Called when the module is unloaded — via `um`, `reload`, or any loader operation.
+Called when the module is unloaded - via `um`, `reload`, or any loader operation.
 
 ```python
 @kernel.register.uninstall()

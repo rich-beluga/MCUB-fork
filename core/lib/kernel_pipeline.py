@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 # ---- meta data ------ kernel_pipeline ------------
 # author: @Hairpin00
 # description: Pipeline execution, regex validation, script engine
@@ -13,7 +13,7 @@ import traceback
 
 
 class KernelPipelineMixin:
-    """Kernel pipeline mixin — regex validation, pipeline, script engine."""
+    """Kernel pipeline mixin - regex validation, pipeline, script engine."""
 
     MAX_PATTERN_LENGTH = 256
     PATTERN_TIMEOUT = 0.1

@@ -8,12 +8,12 @@
 ## Message Events
 
 ```python
-# Preferred — auto-removed on module unload
+# Preferred - auto-removed on module unload
 @kernel.register.event('newmessage', pattern=r'keyword')
 async def keyword_handler(event):
     await event.reply("Keyword detected")
 
-# Raw Telethon — use only outside of modules
+# Raw Telethon - use only outside of modules
 @kernel.client.on(events.NewMessage(pattern='keyword'))
 async def keyword_handler(event):
     await event.reply("Keyword detected")

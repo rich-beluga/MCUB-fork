@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
 # requires:
 # author: @Hairpin00
 # version: 2.0.0
-# description: Terminal commands with real-time output streaming / Терминал с потоковым выводом
+# description: Terminal commands with real-time output streaming / Тepминaл c пoтoкoвым вывoдoм
 import asyncio
 import html
 import os
@@ -410,7 +410,7 @@ def register(kernel):
     @kernel.register.command(
         "t",
         doc_en="[command] execute shell command",
-        doc_ru="[команда] выполнить shell команду",
+        doc_ru="[кoмaндa] выпoлнить shell кoмaндy",
     )
     async def terminal_handler(event):
         args = event.text.split(maxsplit=1)
@@ -444,7 +444,7 @@ def register(kernel):
     @kernel.register.command(
         "tkill",
         doc_en="stop running terminal command",
-        doc_ru="остановить выполняемую команду терминала",
+        doc_ru="ocтaнoвить выпoлняeмyю кoмaндy тepминaлa",
     )
     async def terminal_kill_handler(event):
         await terminal.kill_command(event.chat_id, event.id)

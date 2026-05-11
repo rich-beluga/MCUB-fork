@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ class TrModule(ModuleBase):
     version = "1.0.3"
     author = "@hairpin00"
     description = {
-        "ru": "Переводчик через Google Translate",
+        "ru": "Пepeвoдчик чepeз Google Translate",
         "en": "Translator using Google Translate API",
     }
 
@@ -121,7 +121,7 @@ class TrModule(ModuleBase):
 
     @command(
         "tr",
-        doc_ru="перевести текст через Google Translate",
+        doc_ru="пepeвecти тeкcт чepeз Google Translate",
         doc_en="translate text using Google Translate",
     )
     async def cmd_tr(self, event: events.NewMessage.Event) -> None:

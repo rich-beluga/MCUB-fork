@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
@@ -56,8 +56,8 @@ _MAX_EVENT_TEXT_LEN = 200
 _MAX_RETRIES = 2
 
 # Mute / lifetime / similar
-_MUTE_TTL = 3600  # seconds — default "Mute 1h"
-_FIRST_SEEN_TTL = 86400  # 24 h — how long we remember first occurrence
+_MUTE_TTL = 3600  # seconds - default "Mute 1h"
+_FIRST_SEEN_TTL = 86400  # 24 h - how long we remember first occurrence
 _SIMILAR_MAX = 5  # max error IDs stored per source-function slot
 _LOG_TAIL_LINES = 50  # lines to attach when an error is critical
 _CRITICAL_REPEAT_THRESHOLD = 5  # attach log file after this many repeats
@@ -152,14 +152,14 @@ def _sig_hash(text: str) -> str:
 
 def override_text(exception: Exception) -> str | None:
     """Return a user-friendly HTML string for well-known error types."""
-    # Use isinstance — faster and robust against subclassing
+    # Use isinstance - faster and robust against subclassing
     if isinstance(exception, (TimedOutError, NetworkMigrateError)):
         return "✈️ <b>Connection problems on the server.</b>"
     if isinstance(exception, ServerError):
         return "📡 <b>Telegram servers are currently experiencing issues.</b>"
     if isinstance(exception, FloodWaitError):
         seconds = getattr(exception, "seconds", 0)
-        return f"✋ <b>Flood wait triggered — retry in {seconds}s.</b>"
+        return f"✋ <b>Flood wait triggered - retry in {seconds}s.</b>"
     if isinstance(exception, ModuleNotFoundError):
         detail = traceback.format_exception_only(type(exception), exception)[0]
         detail = detail.split(":", 1)[-1].strip()
@@ -613,7 +613,7 @@ class KernelLogger:
         if not self.log_chat_id:
             return False
 
-        # Resolve client BEFORE the lock — authorisation check may be a network call
+        # Resolve client BEFORE the lock - authorisation check may be a network call
         client = await self._get_client()
         if not client or not client.is_connected():
             return False

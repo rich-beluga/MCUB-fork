@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
 
 # author: @Hairpin00
 # version: 2.1.0-beta
-# description: API protection with request analytics / Защита API с аналитикой запросов
+# description: API protection with request analytics / Зaщитa API c aнaлитикoй зaпpocoв
 import asyncio
 import datetime
 import json
@@ -61,10 +61,10 @@ class RequestAnalyzer:
     """
     Four-layer deep analysis of API request patterns:
 
-    1. Multi-window counters   — simultaneous 1s / 5s / 15s / 60s windows
-    2. Z-score anomaly score   — current rate vs. rolling baseline (mean ± σ)
-    3. Predictive ETA          — linear rate extrapolation to threshold breach
-    4. Method correlation graph — bigram transitions + cosine similarity to
+    1. Multi-window counters   - simultaneous 1s / 5s / 15s / 60s windows
+    2. Z-score anomaly score   - current rate vs. rolling baseline (mean ± σ)
+    3. Predictive ETA          - linear rate extrapolation to threshold breach
+    4. Method correlation graph - bigram transitions + cosine similarity to
                                   hourly behavioral profile
     """
 
@@ -332,7 +332,7 @@ class RequestAnalyzer:
         for w in self.WINDOWS:
             d = windows[w]
             win_lines.append(
-                f"  `{w:>2}s` — all: **{d['total']}**  /  relevant: **{d['relevant']}**"
+                f"  `{w:>2}s` - all: **{d['total']}**  /  relevant: **{d['relevant']}**"
             )
 
         z_str = f"**{z:+.2f}σ**"
@@ -359,14 +359,14 @@ class RequestAnalyzer:
         if top_tr:
             tr_lines = "\n".join(f"  `{p}→{c}`: {n}x" for (p, c), n in top_tr)
         else:
-            tr_lines = "  —"
+            tr_lines = "  -"
 
         if anom_tr:
             anom_lines = "\n".join(
                 f"  `{p}→{c}`: {n}x  (z={z})" for (p, c), n, z in anom_tr
             )
         else:
-            anom_lines = "  —"
+            anom_lines = "  -"
 
         backoff_str = f"{self.backoff_seconds():.0f}s (trigger #{self.trigger_count})"
 
@@ -579,7 +579,7 @@ def register(kernel):
             reason = getattr(violation, "reason", str(violation))
             mode = api_config.get("mcub_mode", "safe")
 
-            kernel.logger.warning(f"MCUB violation [{mode}]: {method} — {reason}")
+            kernel.logger.warning(f"MCUB violation [{mode}]: {method} - {reason}")
 
             # Feed into analytics so transitions / Z-score include blocked attempts
             now = time.time()
@@ -650,7 +650,7 @@ def register(kernel):
             blocked_until = now + block_dur
             kernel.logger.warning(
                 f"API protection triggered (attempt #{analyzer.trigger_count}): "
-                f"{total_relevant} relevant requests in {interval}s — "
+                f"{total_relevant} relevant requests in {interval}s - "
                 f"blocking for {block_dur:.0f}s"
             )
             asyncio.create_task(
@@ -840,7 +840,7 @@ def register(kernel):
     @kernel.register.command(
         "api_protection",
         doc_en="show/configure API protection",
-        doc_ru="показать/настроить защиту API",
+        doc_ru="пoкaзaть/нacтpoить зaщитy API",
     )
     async def api_protection_handler(event):
         nonlocal protection_enabled
@@ -904,7 +904,7 @@ def register(kernel):
     @kernel.register.command(
         "api_reset",
         doc_en="reset API protection stats",
-        doc_ru="сбросить статистику защиты API",
+        doc_ru="cбpocить cтaтиcтикy зaщиты API",
     )
     async def api_reset_handler(event):
         nonlocal blocked_until
@@ -916,7 +916,7 @@ def register(kernel):
     @kernel.register.command(
         "api_suspend",
         doc_en="<seconds> - temporarily suspend API protection",
-        doc_ru="<секунды> - приостановить защиту API",
+        doc_ru="<ceкyнды> - пpиocтaнoвить зaщитy API",
     )
     async def api_suspend_handler(event):
         nonlocal blocked_until
@@ -973,7 +973,7 @@ def register(kernel):
                 ]
                 await event.edit(choose_mode_label, buttons=buttons, parse_mode="html")
             else:
-                # No MCUB — just enable, no mode step
+                # No MCUB - just enable, no mode step
                 protection_enabled = api_config["enable_protection"] = True
                 await event.edit(
                     f'<tg-emoji emoji-id="5368585403467048206">🪬</tg-emoji> {on_label}',
@@ -1010,7 +1010,7 @@ def register(kernel):
 
             label = (
                 f'<tg-emoji emoji-id="5368585403467048206">🪬</tg-emoji> '
-                f"{on_label} · "
+                f"{on_label} . "
                 f"{mode_set_tpl.format(mode=mode, dry='')}"
             )
             await event.edit(label, parse_mode="html")

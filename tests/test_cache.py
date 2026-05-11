@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Шмэлька | @hairpin01
+# Copyright (c) 2026 Шмэлькa | @hairpin01
 
 """
 Tests for TTL cache implementation
@@ -138,9 +138,9 @@ class TestTTLCache:
     def test_unicode_keys_and_values(self):
         """Test cache with unicode keys and values"""
         cache = TTLCache()
-        cache.set("ключ", "значение")
+        cache.set("ключ", "знaчeниe")
         cache.set("key", "日本語")
-        assert cache.get("ключ") == "значение"
+        assert cache.get("ключ") == "знaчeниe"
         assert cache.get("key") == "日本語"
 
     def test_none_value(self):

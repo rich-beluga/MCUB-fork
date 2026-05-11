@@ -6,12 +6,12 @@
 
 ## Features
 
-- **Modules** — create plugins in `modules/` and `modules_loaded/`
-- **Commands** — register commands with `@kernel.register.command()`
-- **Watchers** — track messages with `@kernel.register.watcher()`
-- **Events** — handle events with `@kernel.register.event()`
-- **Inline bots** — create inline forms and buttons
-- **Scheduler** — schedule tasks with `kernel.scheduler`
+- **Modules** - create plugins in `modules/` and `modules_loaded/`
+- **Commands** - register commands with `@kernel.register.command()`
+- **Watchers** - track messages with `@kernel.register.watcher()`
+- **Events** - handle events with `@kernel.register.event()`
+- **Inline bots** - create inline forms and buttons
+- **Scheduler** - schedule tasks with `kernel.scheduler`
 
 ## Quick Start
 
@@ -39,6 +39,6 @@ Use `.hello` in any chat.
 
 ## Learn More
 
-- [Module Structure](module-structure.md) — module structure, headers, directives
-- [Command Registration](../api/commands.md) — command registration
-- [Best Practices](../guides/best-practices.md) — recommended patterns
+- [Module Structure](module-structure.md) - module structure, headers, directives
+- [Command Registration](../api/commands.md) - command registration
+- [Best Practices](../guides/best-practices.md) - recommended patterns
