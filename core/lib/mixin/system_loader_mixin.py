@@ -7,14 +7,14 @@ import asyncio
 import importlib.util
 import inspect
 import os
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, cast
 import sys
+from collections.abc import Callable
+from typing import TYPE_CHECKING, cast
 
 from ..utils.exceptions import CommandConflictError
 
 if TYPE_CHECKING:
-    from kernel import Kernel
+    pass
 
 
 class SystemLoaderMixin:
@@ -25,7 +25,6 @@ class SystemLoaderMixin:
 
     async def load_system_modules(self) -> None:
         """Load all .py files from the system modules directory."""
-        import os
 
         k = self.k
 
@@ -66,8 +65,6 @@ class SystemLoaderMixin:
                             and class_display_name != module_name
                             and class_display_name not in k.system_modules
                         ):
-                            import os
-
                             old_path = file_path
                             new_path = os.path.join(
                                 k.MODULES_DIR, f"{class_display_name}.py"
