@@ -4,6 +4,7 @@
 import logging
 import types
 import typing
+from collections.abc import Awaitable, Callable
 
 if typing.TYPE_CHECKING:
     from .runtime import _InlineProxy
@@ -80,7 +81,7 @@ class CompatCallbackQuery:
         edit_unit = getattr(self._inline_proxy, "_edit_unit", None)
         if callable(edit_unit) and (self.unit_id or self.inline_message_id):
             edit_reply_markup = kwargs.pop("buttons", None)
-            result = await edit_unit(
+            result = await typing.cast(Callable[..., Awaitable[typing.Any]], edit_unit)(
                 *args,
                 unit_id=self.unit_id or None,
                 inline_message_id=self.inline_message_id,
@@ -157,7 +158,7 @@ class CompatMessage:
         edit_unit = getattr(inline_proxy, "_edit_unit", None)
         if callable(edit_unit) and (self.unit_id or self.inline_message_id):
             edit_reply_markup = kwargs.pop("buttons", None)
-            result = await edit_unit(
+            result = await typing.cast(Callable[..., Awaitable[typing.Any]], edit_unit)(
                 *args,
                 unit_id=self.unit_id or None,
                 inline_message_id=self.inline_message_id,

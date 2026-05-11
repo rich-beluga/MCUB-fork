@@ -7,7 +7,8 @@ import asyncio
 import importlib.util
 import inspect
 import os
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, cast
 import sys
 
 from ..utils.exceptions import CommandConflictError
@@ -88,7 +89,7 @@ class SystemLoaderMixin:
                                 self, "_rename_sys_module_entry", None
                             )
                             if callable(rename_sys_module):
-                                rename_sys_module(
+                                cast(Callable[..., None], rename_sys_module)(
                                     original_module_name,
                                     class_display_name,
                                     module,

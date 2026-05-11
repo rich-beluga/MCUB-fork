@@ -8,7 +8,8 @@ import importlib.util
 import inspect
 import os
 import sys
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, cast
 
 from ..utils.exceptions import CommandConflictError
 
@@ -30,7 +31,7 @@ class UserLoaderMixin:
 
         purge_stale_modules = getattr(self, "_purge_stale_loaded_module_entries", None)
         if callable(purge_stale_modules):
-            purge_stale_modules()
+            cast(Callable[[], None], purge_stale_modules)()
 
         try:
             from core.lib.loader.hikka_compat import is_hikka_module, load_hikka_module
@@ -140,7 +141,7 @@ class UserLoaderMixin:
                                 self, "_rename_sys_module_entry", None
                             )
                             if callable(rename_sys_module):
-                                rename_sys_module(
+                                cast(Callable[..., None], rename_sys_module)(
                                     module_name, class_display_name, module, file_path
                                 )
                             else:
