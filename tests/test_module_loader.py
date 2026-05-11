@@ -26,6 +26,50 @@ class TestModuleLoading:
         assert loader is not None
 
 
+class TestHikkaInlineDelete:
+    """Test Hikka inline message deletion safety."""
+
+    @pytest.mark.asyncio
+    async def test_delete_unit_message_skips_non_mtproto_message_id(self):
+        from core.lib.loader.hikka_compat.runtime import InlineProxy
+
+        client = SimpleNamespace(delete_messages=AsyncMock())
+        kernel = SimpleNamespace(
+            client=client,
+            bot_client=None,
+            logger=MagicMock(),
+            config={},
+        )
+        inline = InlineProxy(kernel)
+        inline._units["u"] = {"chat": 123, "message_id": 2**40}
+
+        result = await inline._delete_unit_message(unit_id="u")
+
+        assert result is False
+        client.delete_messages.assert_not_called()
+        assert "u" in inline._units
+
+    @pytest.mark.asyncio
+    async def test_delete_unit_message_passes_message_id_as_list(self):
+        from core.lib.loader.hikka_compat.runtime import InlineProxy
+
+        client = SimpleNamespace(delete_messages=AsyncMock())
+        kernel = SimpleNamespace(
+            client=client,
+            bot_client=None,
+            logger=MagicMock(),
+            config={},
+        )
+        inline = InlineProxy(kernel)
+        inline._units["u"] = {"chat": 123, "message_id": "42"}
+
+        result = await inline._delete_unit_message(unit_id="u")
+
+        assert result is True
+        client.delete_messages.assert_awaited_once_with(123, [42])
+        assert "u" not in inline._units
+
+
 class TestDetectModuleType:
     """Test detect_module_type() method - Bug fix for params[0].name"""
 

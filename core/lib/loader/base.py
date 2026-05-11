@@ -464,9 +464,12 @@ class ModuleBase(ABC):
 
     def _cleanup_callback_tokens(self) -> None:
         tokens = getattr(self, "_callback_tokens", None) or []
+        if not tokens:
+            return
+
         is_kernel_proxy = type(self.kernel).__name__ == "ModuleKernelProxy"
         remove_tokens = getattr(self.kernel, "remove_inline_callback_tokens", None)
-        if is_kernel_proxy and tokens and callable(remove_tokens):
+        if is_kernel_proxy and callable(remove_tokens):
             remove_tokens(tokens)
             self._callback_tokens = []
             return

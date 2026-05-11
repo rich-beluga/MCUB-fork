@@ -2159,13 +2159,23 @@ class InlineProxy:
         target_msg = message_id if message_id is not None else unit.get("message_id")
         if target_chat is None or target_msg is None:
             return False
+        try:
+            target_msg = int(target_msg)
+        except (TypeError, ValueError):
+            return False
+        if not -(2**31) <= target_msg <= 2**31 - 1:
+            self._kernel.logger.debug(
+                "[hikka_compat] skip delete for non-mtproto message id: %r",
+                target_msg,
+            )
+            return False
 
         client = getattr(self._kernel, "client", None)
         if client is None or not hasattr(client, "delete_messages"):
             return False
 
         try:
-            await client.delete_messages(target_chat, target_msg)
+            await client.delete_messages(target_chat, [target_msg])
         except Exception as e:
             self._kernel.logger.debug(
                 f"[hikka_compat] _delete_unit_message failed: {e}"

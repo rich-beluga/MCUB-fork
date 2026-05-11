@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -205,3 +206,55 @@ class TestModuleBaseRuntime:
         await loader.run_post_load(module, "LoopMod", is_install=False, is_reload=True)
 
         assert instance.reload_calls == 1
+
+    def test_cleanup_callback_tokens_empty_proxy_does_not_touch_protected_map(self):
+        from core.lib.loader.kernel_proxy import ModuleKernelProxy
+        from core.lib.loader.module_base import ModuleBase
+
+        class CallbackMod(ModuleBase):
+            name = "CallbackMod"
+            strings = {"ru": {"ok": "ok"}}
+
+        real_kernel = make_kernel()
+        real_kernel.register = DummyRegister()
+        real_kernel.inline_callback_map = {"token": {"unit": "keep"}}
+        real_kernel._inline_cb_lock = threading.Lock()
+
+        instance = CallbackMod(
+            ModuleKernelProxy(real_kernel, "eval_yuweid"),
+            MagicMock(),
+            DummyRegister(),
+        )
+        instance._callback_tokens = []
+
+        instance._cleanup_callback_tokens()
+
+        assert real_kernel.inline_callback_map == {"token": {"unit": "keep"}}
+
+    def test_cleanup_callback_tokens_uses_proxy_safe_removal(self):
+        from core.lib.loader.kernel_proxy import ModuleKernelProxy
+        from core.lib.loader.module_base import ModuleBase
+
+        class CallbackMod(ModuleBase):
+            name = "CallbackMod"
+            strings = {"ru": {"ok": "ok"}}
+
+        real_kernel = make_kernel()
+        real_kernel.register = DummyRegister()
+        real_kernel.inline_callback_map = {
+            "remove": {"unit": "old"},
+            "keep": {"unit": "live"},
+        }
+        real_kernel._inline_cb_lock = threading.Lock()
+
+        instance = CallbackMod(
+            ModuleKernelProxy(real_kernel, "eval_yuweid"),
+            MagicMock(),
+            DummyRegister(),
+        )
+        instance._callback_tokens = ["remove", "missing"]
+
+        instance._cleanup_callback_tokens()
+
+        assert real_kernel.inline_callback_map == {"keep": {"unit": "live"}}
+        assert instance._callback_tokens == []
