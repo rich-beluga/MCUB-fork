@@ -167,51 +167,11 @@ class ModuleUnloaderMixin:
                             removed_events,
                         )
 
-        # Remove raw client.on() handlers (Telethon-MCUB automatic tracking)
-        try:
-            if hasattr(k.client, "remove_module_handlers"):
-                k.client.remove_module_handlers(module_name)
-            elif hasattr(k.client, "_event_builders") and k.client._event_builders:
-                # Fallback for standard Telethon: remove by scanning _event_builders
-                module = k.loaded_modules.get(module_name) or k.system_modules.get(
-                    module_name
-                )
-                if module:
-                    reg = getattr(module, "register", None)
-                    if reg and hasattr(reg, "__event_handlers__"):
-                        for entry in reg.__event_handlers__:
-                            handler = entry[0]
-                            event_obj = entry[1] if len(entry) > 1 else None
-                            try:
-                                k.client.remove_event_handler(handler, event_obj)
-                            except Exception:
-                                pass
-
-            if hasattr(k, "bot_client") and k.bot_client:
-                if hasattr(k.bot_client, "remove_module_handlers"):
-                    k.bot_client.remove_module_handlers(module_name)
-                elif (
-                    hasattr(k.bot_client, "_event_builders")
-                    and k.bot_client._event_builders
-                ):
-                    # Fallback for standard Telethon bot_client
-                    module = k.loaded_modules.get(module_name) or k.system_modules.get(
-                        module_name
-                    )
-                    if module:
-                        reg = getattr(module, "register", None)
-                        if reg and hasattr(reg, "__event_handlers__"):
-                            for entry in reg.__event_handlers__:
-                                handler = entry[0]
-                                event_obj = entry[1] if len(entry) > 1 else None
-                                try:
-                                    k.bot_client.remove_event_handler(
-                                        handler, event_obj
-                                    )
-                                except Exception:
-                                    pass
-        except Exception as e:
-            k.logger.error(f"Error removing module raw handlers in {module_name}: {e}")
+        # Do not call Telethon-MCUB ``remove_module_handlers(module_name)`` here.
+        # MCUB has already removed exact callbacks tracked in the module
+        # register above.  A broad client-side cleanup can invalidate unrelated
+        # core handlers or leave Telethon's type-dispatch cache incomplete during
+        # reload/install flows.
 
         uninstall = getattr(reg, "__uninstall__", None)
         if uninstall is not None:

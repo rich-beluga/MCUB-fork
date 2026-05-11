@@ -629,7 +629,9 @@ class ModuleLoaderMixin:
             if spec is None:
                 return False, f"Cannot create module spec for {module_name}"
 
-            module = self._build_module(spec, file_path, module_name)
+            module = self._build_module(
+                spec, file_path, module_name, is_system=is_system
+            )
             sys.modules[module_name] = module
 
             try:
@@ -654,12 +656,6 @@ class ModuleLoaderMixin:
                 hasattr(module, "register"),
             )
 
-            k.set_loading_module(module_name, "system" if is_system else "user")
-
-            if not await self.register_module(module, mod_type, module_name):
-                k.clear_loading_module()
-                return False, "Module registration failed"
-
             class_display_name = None
             original_module_name = module_name
             if mod_type == "class":
@@ -671,8 +667,6 @@ class ModuleLoaderMixin:
                     and class_display_name != "Unnamed"
                     and class_display_name != module_name
                 ):
-                    import os
-
                     old_path = file_path
                     new_path = os.path.join(
                         os.path.dirname(file_path), f"{class_display_name}.py"
@@ -682,25 +676,28 @@ class ModuleLoaderMixin:
                         try:
                             os.rename(old_path, new_path)
                             k.logger.info(
-                                f"Renamed module file: {module_name} -> {class_display_name}"
+                                "Renamed module file before registration: %s -> %s",
+                                module_name,
+                                class_display_name,
                             )
                             file_path = new_path
                         except Exception as e:
                             k.logger.warning(f"Failed to rename module file: {e}")
-
-                    for cmd, owner in list(k.command_owners.items()):
-                        if owner == original_module_name:
-                            k.command_owners[cmd] = class_display_name
-
-                    for cmd, owner in list(k.bot_command_owners.items()):
-                        if owner == original_module_name:
-                            k.bot_command_owners[cmd] = class_display_name
 
                     self._rename_sys_module_entry(
                         original_module_name, class_display_name, module, file_path
                     )
                     module_name = class_display_name
 
+            k.set_loading_module(module_name, "system" if is_system else "user")
+
+            if not await self.register_module(
+                module, mod_type, module_name, is_system=is_system
+            ):
+                k.clear_loading_module()
+                return False, "Module registration failed"
+
+            if mod_type == "class":
                 k.logger.info(f"Module loaded [class-style]: {module_name}")
                 if is_system:
                     k.system_modules[module_name] = module
@@ -720,6 +717,22 @@ class ModuleLoaderMixin:
                 is_install=not is_reload,
                 is_reload=is_reload,
             )
+            for helper_name in (
+                "dedupe_event_builders",
+                "ensure_core_message_handlers",
+                "ensure_registered_module_handlers",
+            ):
+                helper = getattr(k, helper_name, None)
+                if callable(helper):
+                    try:
+                        helper(reason=f"load_after_{module_name}")
+                    except Exception as e:
+                        k.logger.warning(
+                            "Post-load handler recovery %s failed for %s: %s",
+                            helper_name,
+                            module_name,
+                            e,
+                        )
             k.logger.debug(
                 "[loader.load] finished module=%r commands=%r aliases=%r",
                 module_name,
@@ -742,9 +755,7 @@ class ModuleLoaderMixin:
                 except Exception as e:
                     k.logger.error(f"Module {module_name} init() failed: {e}")
 
-            final_module_name = (
-                class_display_name if mod_type == "class" else module_name
-            )
+            final_module_name = module_name
             return (
                 True,
                 f"Module {final_module_name} loaded ({mod_type} type)",
@@ -848,10 +859,23 @@ class ModuleLoaderMixin:
             if ok:
                 import shutil
 
-                final_path = os.path.join(k.MODULES_LOADED_DIR, f"{module_name}.py")
-                shutil.move(file_path, final_path)
+                actual_name = module_name
+                actual_path = file_path
+                temp_root = os.path.abspath(temp_dir)
+                for loaded_name, loaded_module in k.loaded_modules.items():
+                    loaded_path = getattr(loaded_module, "__file__", None)
+                    if loaded_path and os.path.abspath(loaded_path).startswith(
+                        temp_root
+                    ):
+                        actual_name = loaded_name
+                        actual_path = loaded_path
+                        break
+
+                final_path = os.path.join(k.MODULES_LOADED_DIR, f"{actual_name}.py")
+                if os.path.abspath(actual_path) != os.path.abspath(final_path):
+                    shutil.move(actual_path, final_path)
                 shutil.rmtree(temp_dir, ignore_errors=True)
-                return True, f"Module {module_name} installed from URL"
+                return True, f"Module {actual_name} installed from URL"
             else:
                 import shutil
 
@@ -940,9 +964,26 @@ class ModuleLoaderMixin:
                     )
 
                     if ok:
-                        final_path = os.path.join(k.MODULES_LOADED_DIR, f"{name}.py")
-                        shutil.copy2(file_path, final_path)
-                        loaded_modules.append(name)
+                        actual_name = name
+                        actual_path = file_path
+                        extract_root = os.path.abspath(root)
+                        for loaded_name, loaded_module in k.loaded_modules.items():
+                            if loaded_name in loaded_modules:
+                                continue
+                            loaded_path = getattr(loaded_module, "__file__", None)
+                            if loaded_path and os.path.abspath(loaded_path).startswith(
+                                extract_root
+                            ):
+                                actual_name = loaded_name
+                                actual_path = loaded_path
+                                break
+
+                        final_path = os.path.join(
+                            k.MODULES_LOADED_DIR, f"{actual_name}.py"
+                        )
+                        if os.path.abspath(actual_path) != os.path.abspath(final_path):
+                            shutil.copy2(actual_path, final_path)
+                        loaded_modules.append(actual_name)
                     else:
                         failed_modules.append(f"{name}: {msg}")
 

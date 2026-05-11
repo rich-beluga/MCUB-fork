@@ -44,7 +44,9 @@ class SystemLoaderMixin:
                 await self.pre_install_requirements(code, module_name)
 
                 spec = importlib.util.spec_from_file_location(module_name, file_path)
-                module = self._build_module(spec, file_path, module_name)
+                module = self._build_module(
+                    spec, file_path, module_name, is_system=True
+                )
                 sys.modules[module_name] = module
 
                 k.set_loading_module(module_name, "system")

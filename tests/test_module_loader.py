@@ -862,7 +862,8 @@ class TestClassStyleModule:
         result = await loader.register_module(module, "class", "test_class_mod")
 
         assert result is True
-        assert "test_class_mod" in kernel._class_module_instances
+        assert "MyCustomName" in kernel._class_module_instances
+        assert "test_class_mod" not in kernel._class_module_instances
 
     @pytest.mark.asyncio
     async def test_find_module_base_class(self):

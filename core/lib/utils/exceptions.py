@@ -17,3 +17,17 @@ class CommandConflictError(Exception):
 
 class McubTelethonError(Exception):
     pass
+
+
+class CallInsecure(Exception):
+    """Raised when a module attempts to access protected core internals."""
+
+    def __init__(self, name: str, module_name: str | None = None):
+        target = f"'{name}'"
+        if module_name:
+            message = f"Module '{module_name}' attempted insecure access to {target}"
+        else:
+            message = f"Insecure access to protected core attribute {target}"
+        super().__init__(message)
+        self.name = name
+        self.module_name = module_name

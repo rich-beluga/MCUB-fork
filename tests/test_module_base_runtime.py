@@ -109,6 +109,8 @@ class TestModuleBaseRuntime:
             __name__="dep_module", _class_instance=dep_instance
         )
         kernel.loaded_modules = {"DepMod": dep_module}
+        constructed_only = SimpleNamespace(name="ConstructedOnly")
+        kernel._class_module_instances = {"ConstructedOnly": constructed_only}
 
         instance = HelperMod(kernel, MagicMock(), DummyRegister())
         event = make_event(text="!demo 42 --flag", is_pm=True)
@@ -123,7 +125,11 @@ class TestModuleBaseRuntime:
         assert parser.get(0) == 42
         assert parser.get_flag("flag") is True
         assert instance.lookup_module("DepMod") is dep_instance
+        assert instance.lookup_module("DepMod", all_loaded=True) is dep_instance
+        assert instance.lookup_module("ConstructedOnly") is constructed_only
+        assert instance.lookup_module("ConstructedOnly", all_loaded=True) is None
         assert instance.require_module("DepMod") is dep_instance
+        assert instance.require_module("DepMod", all_loaded=True) is dep_instance
 
         with pytest.raises(LookupError):
             instance.require_module("MissingMod")
