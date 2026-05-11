@@ -118,11 +118,14 @@ class ModuleKernelProxy:
             "loaded_module_names",
             "loaded_modules_view",
             "system_modules_view",
+            "_live_module_configs",
             "remove_inline_callback_tokens",
             "store_inline_callback",
             "allow_inline_callback_user",
             "set_live_module_config",
+            "get_live_module_config",
             "_ensure_callback_storage",
+            "_get_module_state",
             "_deny",
             "__class__",
             "__repr__",
@@ -134,6 +137,7 @@ class ModuleKernelProxy:
         object.__setattr__(self, "_kernel", kernel)
         object.__setattr__(self, "_module_name", module_name)
         object.__setattr__(self, "_register_proxy", None)
+        object.__setattr__(self, "_module_state", {})
 
     @property
     def module_name(self) -> str:
@@ -221,6 +225,21 @@ class ModuleKernelProxy:
         kernel = object.__getattribute__(self, "_kernel")
         return MappingProxyType(dict(getattr(kernel, "system_modules", {})))
 
+    @property
+    def _live_module_configs(self) -> MappingProxyType:
+        """Read-only compatibility view for modules checking live config.
+
+        Older MCUB/repo modules commonly use
+        ``getattr(kernel, "_live_module_configs", {}).get(__name__)``. Keep that
+        read path working without exposing the mutable kernel mapping itself.
+        Mutations must go through ``set_live_module_config``.
+        """
+        kernel = object.__getattribute__(self, "_kernel")
+        return MappingProxyType(dict(getattr(kernel, "_live_module_configs", {})))
+
+    def _get_module_state(self) -> dict[str, Any]:
+        return object.__getattribute__(self, "_module_state")
+
     def _ensure_callback_storage(self) -> tuple[Any, dict[str, Any]]:
         import threading
 
@@ -278,6 +297,11 @@ class ModuleKernelProxy:
             kernel._live_module_configs = live_configs
         live_configs[module_name] = config
 
+    def get_live_module_config(self, module_name: str, default: Any = None) -> Any:
+        kernel = object.__getattribute__(self, "_kernel")
+        live_configs = getattr(kernel, "_live_module_configs", None) or {}
+        return live_configs.get(module_name, default)
+
     def __getattribute__(self, name: str) -> Any:
         if name == "__dict__":
             _raise_insecure(name, object.__getattribute__(self, "_module_name"))
@@ -285,10 +309,15 @@ class ModuleKernelProxy:
             return object.__getattribute__(self, name)
         if name in PROTECTED_KERNEL_NAMES or name.startswith("_"):
             _raise_insecure(name, object.__getattribute__(self, "_module_name"))
+        module_state = object.__getattribute__(self, "_module_state")
+        if name in module_state:
+            return module_state[name]
         return getattr(object.__getattribute__(self, "_kernel"), name)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        self._deny(name)
+        if name.startswith("_") or name in PROTECTED_KERNEL_NAMES:
+            self._deny(name)
+        object.__getattribute__(self, "_module_state")[name] = value
 
     def __delattr__(self, name: str) -> None:
         self._deny(name)
@@ -308,10 +337,12 @@ class ModuleKernelProxy:
                 "loaded_module_names",
                 "loaded_modules_view",
                 "system_modules_view",
+                "_live_module_configs",
                 "remove_inline_callback_tokens",
                 "store_inline_callback",
                 "allow_inline_callback_user",
                 "set_live_module_config",
+                "get_live_module_config",
             }
         )
         return sorted(names)

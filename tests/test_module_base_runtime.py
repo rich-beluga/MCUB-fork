@@ -258,3 +258,39 @@ class TestModuleBaseRuntime:
 
         assert real_kernel.inline_callback_map == {"keep": {"unit": "live"}}
         assert instance._callback_tokens == []
+
+    def test_kernel_proxy_exposes_readonly_live_config_view(self):
+        from core.lib.loader.kernel_proxy import ModuleKernelProxy
+
+        real_kernel = make_kernel()
+        real_kernel._live_module_configs = {"dnd-MCUB-repo": {"enabled": True}}
+        proxy = ModuleKernelProxy(real_kernel, "dnd-MCUB-repo")
+
+        assert getattr(proxy, "_live_module_configs", {}).get("dnd-MCUB-repo") == {
+            "enabled": True
+        }
+        assert proxy.get_live_module_config("dnd-MCUB-repo") == {"enabled": True}
+
+        with pytest.raises(TypeError):
+            proxy._live_module_configs["other"] = {}
+
+        assert "other" not in real_kernel._live_module_configs
+
+    def test_kernel_proxy_keeps_public_module_state_local(self):
+        from core.lib.loader.kernel_proxy import ModuleKernelProxy
+        from core.lib.utils.exceptions import CallInsecure
+
+        real_kernel = make_kernel()
+        proxy = ModuleKernelProxy(real_kernel, "silent-tags-MCUB-repo")
+
+        proxy.silent_tags_ratelimit = []
+        proxy.silent_tags_ratelimit += [123]
+
+        assert proxy.silent_tags_ratelimit == [123]
+        assert "silent_tags_ratelimit" not in real_kernel.__dict__
+
+        with pytest.raises(CallInsecure):
+            proxy._live_module_configs = {}
+
+        with pytest.raises(CallInsecure):
+            proxy.loaded_modules = {}
