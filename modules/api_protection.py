@@ -22,8 +22,8 @@ from core.lib.loader.module_config import (
     ConfigValue,
     Float,
     Integer,
+    List as ListValidator,
     ModuleConfig,
-    String,
 )
 from utils.strings import Strings
 
@@ -55,6 +55,35 @@ LIMIT_PROFILES = {
     "normal": 200,
     "aggressive": 350,
 }
+
+LIST_CONFIG_KEYS = {"ignore_methods", "mcub_allowlist"}
+
+
+def _coerce_method_list(value: object, default: list[str] | None = None) -> list[str]:
+    """Normalize config value to a clean list of method names."""
+    fallback = list(default or [])
+    parsed: object = value
+
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return fallback
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            parsed = [part.strip() for part in text.split(",")]
+
+    if isinstance(parsed, (list, tuple, set)):
+        result: list[str] = []
+        for item in parsed:
+            if item is None:
+                continue
+            method = str(item).strip()
+            if method:
+                result.append(method)
+        return result
+
+    return fallback
 
 
 class RequestAnalyzer:
@@ -423,7 +452,7 @@ def register(kernel):
             "ignore_methods",
             ["GetMessagesRequest"],
             description="Methods to ignore",
-            validator=String(default='["GetMessagesRequest"]'),
+            validator=ListValidator(default=["GetMessagesRequest"], item_type=str),
         ),
         ConfigValue(
             "enable_protection",
@@ -449,7 +478,7 @@ def register(kernel):
             "mcub_allowlist",
             [],
             description="Methods excluded in custom mode",
-            validator=String(default="[]"),
+            validator=ListValidator(default=[], item_type=str),
         ),
         ConfigValue(
             "enable_analytics",
@@ -501,6 +530,15 @@ def register(kernel):
         ),
     )
 
+    api_config = config
+    protection_enabled = bool(api_config.get("enable_protection", True))
+
+    def _normalize_list_config_values(target_config) -> None:
+        for key in LIST_CONFIG_KEYS:
+            target_config[key] = _coerce_method_list(
+                target_config.get(key), DEFAULT_CONFIG.get(key, [])
+            )
+
     def get_config():
         live_cfg = getattr(kernel, "_live_module_configs", {}).get(__name__)
         if live_cfg:
@@ -508,8 +546,11 @@ def register(kernel):
         return config
 
     async def startup():
+        nonlocal protection_enabled
         config_dict = await kernel.get_module_config(__name__, DEFAULT_CONFIG.copy())
         config.from_dict(config_dict)
+        _normalize_list_config_values(config)
+        protection_enabled = bool(config.get("enable_protection", True))
         config_dict_clean = {k: v for k, v in config.to_dict().items() if v is not None}
         if config_dict_clean:
             await kernel.save_module_config(__name__, config_dict_clean)
@@ -517,14 +558,11 @@ def register(kernel):
 
     asyncio.create_task(startup())
 
-    api_config = config
-
     def persist_api_config():
         cfg = get_config()
         if cfg:
             asyncio.create_task(kernel.save_module_config(__name__, cfg.to_dict()))
 
-    protection_enabled = api_config["enable_protection"]
     blocked_until = 0.0
     original_call = None
     request_log = deque(maxlen=10000)
@@ -535,7 +573,9 @@ def register(kernel):
 
     analyzer = RequestAnalyzer(
         request_log=request_log,
-        ignore_set_fn=lambda: set(api_config["ignore_methods"]),
+        ignore_set_fn=lambda: set(
+            _coerce_method_list(api_config.get("ignore_methods", []))
+        ),
         config=api_config,
     )
 
@@ -558,7 +598,9 @@ def register(kernel):
                 # Build a ProtectionPolicy from config allowlist + dry_run flag
                 from telethon.client.protection import ProtectionPolicy
 
-                allowlist = set(api_config.get("mcub_allowlist", []))
+                allowlist = set(
+                    _coerce_method_list(api_config.get("mcub_allowlist", []))
+                )
                 dry_run = api_config.get("mcub_dry_run", False)
                 policy = ProtectionPolicy(allowlist=allowlist, dry_run=dry_run)
                 client.set_protection_policy(policy)
@@ -633,7 +675,7 @@ def register(kernel):
             analyzer.maybe_reset_backoff(now)
 
         interval = api_config["time_sample"]
-        ignore_set = set(api_config["ignore_methods"])
+        ignore_set = set(_coerce_method_list(api_config.get("ignore_methods", [])))
         profile = api_config.get("limit_profile", "normal")
         if profile == "custom":
             threshold = api_config.get("custom_threshold", 200)
@@ -873,17 +915,20 @@ def register(kernel):
             value = " ".join(args[2:])
             if param in api_config:
                 try:
-                    if isinstance(api_config[param], list):
-                        new_val = json.loads(value)
-                        if not isinstance(new_val, list):
-                            raise ValueError
-                        api_config[param] = new_val
+                    if param in LIST_CONFIG_KEYS:
+                        api_config[param] = _coerce_method_list(
+                            value, DEFAULT_CONFIG.get(param, [])
+                        )
                     elif isinstance(api_config[param], bool):
                         api_config[param] = value.lower() in ("true", "yes", "1")
                     elif isinstance(api_config[param], (int, float)):
                         api_config[param] = type(api_config[param])(value)
                     else:
                         api_config[param] = value
+
+                    if param == "enable_protection":
+                        protection_enabled = bool(api_config[param])
+
                     await event.edit(
                         lang["api_param_set"].format(
                             param=param, value=api_config[param]
