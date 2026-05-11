@@ -21,7 +21,7 @@ import types
 import uuid
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 
@@ -920,7 +920,7 @@ class _CompatLoaderProxy:
 
 
 class _BotProxy:
-    def __init__(self, inline_proxy: "InlineProxy"):
+    def __init__(self, inline_proxy: InlineProxy):
         self._inline_proxy = inline_proxy
 
     @property
@@ -1294,18 +1294,24 @@ class InlineProxy:
                         _a=cb_args,
                         _k=cb_kwargs,
                         _proxy=self,
+                        _unit_id=unit_id,
                     ):
                         from_user_id = getattr(
                             getattr(event, "from_user", None), "id", None
                         )
                         inline_message_id = getattr(event, "inline_message_id", None)
-                        chat_id = getattr(event, "chat_instance", None)
-                        message_id = getattr(event, "message_id", None)
+                        message = getattr(event, "message", None)
+                        chat_id = getattr(event, "chat_id", None) or getattr(
+                            message, "chat_id", None
+                        )
+                        message_id = getattr(event, "message_id", None) or getattr(
+                            message, "id", None
+                        )
                         data_str = event.data.decode() if event.data else ""
 
                         call_obj = InlineCall(
                             data_str,
-                            unit_id="",
+                            unit_id=_unit_id,
                             inline_proxy=_proxy,
                             original_call=event,
                             inline_message_id=inline_message_id,
@@ -1753,9 +1759,9 @@ class InlineProxy:
         self,
         message,
         text: str,
-        rows: list = None,
+        rows: list | None = None,
         force_me: bool = False,
-        always_allow: list = None,
+        always_allow: list | None = None,
         disable_security: bool = False,
         ttl: int | None = None,
         silent: bool = False,
@@ -2059,6 +2065,15 @@ class InlineProxy:
         **kwargs,
     ):
         from .inline_types import InlineMessage as _InlineMessage
+
+        # Hikka-compatible edit callers often normalize ``reply_markup=`` into
+        # Telethon's ``buttons=`` before reaching this lower-level helper.  Keep
+        # accepting that alias here, but consume it as source markup so the
+        # stored unit is updated and the converted Telethon buttons below are
+        # not overwritten by raw Hikka button dicts.
+        buttons_markup = kwargs.pop("buttons", None)
+        if reply_markup is None and buttons_markup is not None:
+            reply_markup = buttons_markup
 
         found_id, unit = self._find_unit(
             unit_id=unit_id,
@@ -2656,7 +2671,7 @@ class Module:
     def get_prefixes(self, *_args, **_kwargs) -> list:
         return [self.get_prefix()]
 
-    def lookup(self, module_name: str) -> Optional["Module"]:
+    def lookup(self, module_name: str) -> Module | None:
         _, inst = _find_kernel_module(self._kernel, module_name)
         if inst is not None:
             if str(module_name).lower() == "loader":

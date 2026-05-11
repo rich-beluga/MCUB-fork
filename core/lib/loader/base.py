@@ -3,30 +3,12 @@
 
 import asyncio
 import copy
-import inspect
 import logging
 import uuid
 from abc import ABC
 from collections.abc import Callable
 from typing import Any
 
-from .decorators import (
-    bot_command,
-    callback,
-    command,
-    error_handler,
-    event,
-    inline,
-    inline_temp,
-    loop,
-    method,
-    on_install,
-    on_uninstall,
-    owner_only,
-    permissions,
-    watcher,
-)
-from core.lib.utils.exceptions import CommandConflictError
 from utils.strings import Strings
 
 
@@ -428,16 +410,28 @@ class ModuleBase(ABC):
         key = f"{module_name or self.name}:{method_name}"
         return getattr(self, "_inline_temp_ids", {}).get(key)
 
-    def lookup_module(self, module_name: str) -> Any:
+    def lookup_module(self, module_name: str, *, all_loaded: bool = False) -> Any:
+        """Find a module by name.
+
+        When ``all_loaded`` is true, return only modules already registered in
+        the fully loaded module maps and ignore in-progress class instances.
+        """
+        kernel_lookup = getattr(self.kernel, "lookup_module", None)
+        if type(self.kernel).__name__ == "ModuleKernelProxy" and callable(
+            kernel_lookup
+        ):
+            return kernel_lookup(module_name, all_loaded=all_loaded)
+
         needle = str(module_name).lower()
 
-        class_instances = getattr(self.kernel, "_class_module_instances", {}) or {}
-        for name, instance in class_instances.items():
-            if (
-                str(name).lower() == needle
-                or str(getattr(instance, "name", "")).lower() == needle
-            ):
-                return instance
+        if not all_loaded:
+            class_instances = getattr(self.kernel, "_class_module_instances", {}) or {}
+            for name, instance in class_instances.items():
+                if (
+                    str(name).lower() == needle
+                    or str(getattr(instance, "name", "")).lower() == needle
+                ):
+                    return instance
 
         for collection_name in ("loaded_modules", "system_modules"):
             collection = getattr(self.kernel, collection_name, {}) or {}
@@ -453,19 +447,30 @@ class ModuleBase(ABC):
                     return target
 
         compat_allmodules = getattr(self.kernel, "_hikka_compat_allmodules_proxy", None)
-        if compat_allmodules is not None and hasattr(compat_allmodules, "lookup"):
+        if (
+            not all_loaded
+            and compat_allmodules is not None
+            and hasattr(compat_allmodules, "lookup")
+        ):
             return compat_allmodules.lookup(module_name)
 
         return None
 
-    def require_module(self, module_name: str) -> Any:
-        module = self.lookup_module(module_name)
+    def require_module(self, module_name: str, *, all_loaded: bool = False) -> Any:
+        module = self.lookup_module(module_name, all_loaded=all_loaded)
         if module is None:
             raise LookupError(f"Required module '{module_name}' is not loaded")
         return module
 
     def _cleanup_callback_tokens(self) -> None:
         tokens = getattr(self, "_callback_tokens", None) or []
+        is_kernel_proxy = type(self.kernel).__name__ == "ModuleKernelProxy"
+        remove_tokens = getattr(self.kernel, "remove_inline_callback_tokens", None)
+        if is_kernel_proxy and tokens and callable(remove_tokens):
+            remove_tokens(tokens)
+            self._callback_tokens = []
+            return
+
         cb_map = getattr(self.kernel, "inline_callback_map", None)
         lock = getattr(self.kernel, "_inline_cb_lock", None)
         if not tokens or cb_map is None or lock is None:
@@ -478,7 +483,12 @@ class ModuleBase(ABC):
 
     def _register_callback(self, func: Callable, ttl: int) -> None:
         """Register a callback handler with auto-generated uuid."""
-        if not hasattr(self.kernel, "inline_callback_map"):
+        is_kernel_proxy = type(self.kernel).__name__ == "ModuleKernelProxy"
+        store_callback = getattr(self.kernel, "store_inline_callback", None)
+
+        if not (is_kernel_proxy and callable(store_callback)) and not hasattr(
+            self.kernel, "inline_callback_map"
+        ):
             import threading
 
             self.kernel._inline_cb_lock = threading.Lock()
@@ -499,28 +509,32 @@ class ModuleBase(ABC):
         wrapper._bound_instance = self
 
         tok = uuid.uuid4().hex
-        import threading
         import time
 
-        lock = self.kernel._inline_cb_lock
-        cb_map = self.kernel.inline_callback_map
+        callback_data = {
+            "handler": wrapper,
+            "args": [],
+            "kwargs": {},
+            "expires_at": time.time() + ttl if ttl else None,
+        }
 
-        with lock:
-            now = time.time()
-            expired = [
-                k
-                for k, v in list(cb_map.items())
-                if v.get("expires_at") and v["expires_at"] < now
-            ]
-            for k in expired:
-                cb_map.pop(k, None)
+        if is_kernel_proxy and callable(store_callback):
+            store_callback(tok, callback_data)
+        else:
+            lock = self.kernel._inline_cb_lock
+            cb_map = self.kernel.inline_callback_map
 
-            cb_map[tok] = {
-                "handler": wrapper,
-                "args": [],
-                "kwargs": {},
-                "expires_at": now + ttl if ttl else None,
-            }
+            with lock:
+                now = time.time()
+                expired = [
+                    k
+                    for k, v in list(cb_map.items())
+                    if v.get("expires_at") and v["expires_at"] < now
+                ]
+                for k in expired:
+                    cb_map.pop(k, None)
+
+                cb_map[tok] = callback_data
 
         self._callback_tokens = getattr(self, "_callback_tokens", [])
         self._callback_tokens.append(tok)
@@ -768,7 +782,12 @@ class ModuleBase(ABC):
 
         from telethon import Button
 
-        if not hasattr(self.kernel, "inline_callback_map"):
+        is_kernel_proxy = type(self.kernel).__name__ == "ModuleKernelProxy"
+        store_callback = getattr(self.kernel, "store_inline_callback", None)
+
+        if not (is_kernel_proxy and callable(store_callback)) and not hasattr(
+            self.kernel, "inline_callback_map"
+        ):
             self.kernel._inline_cb_lock = threading.Lock()
             self.kernel.inline_callback_map = {}
 
@@ -788,43 +807,62 @@ class ModuleBase(ABC):
 
         tok = uuid.uuid4().hex
 
-        lock = self.kernel._inline_cb_lock
-        cb_map = self.kernel.inline_callback_map
+        callback_data = {
+            "handler": wrapper,
+            "args": args,
+            "kwargs": kwargs or {},
+            "data": data,
+            "expires_at": time.time() + ttl if ttl else None,
+        }
 
-        with lock:
-            now = time.time()
-            expired = [
-                k
-                for k, v in list(cb_map.items())
-                if v.get("expires_at") and v["expires_at"] < now
-            ]
-            for k in expired:
-                cb_map.pop(k, None)
+        if is_kernel_proxy and callable(store_callback):
+            store_callback(tok, callback_data)
+        else:
+            lock = self.kernel._inline_cb_lock
+            cb_map = self.kernel.inline_callback_map
 
-            cb_map[tok] = {
-                "handler": wrapper,
-                "args": args,
-                "kwargs": kwargs or {},
-                "data": data,
-                "expires_at": now + ttl if ttl else None,
-            }
+            with lock:
+                now = time.time()
+                expired = [
+                    k
+                    for k, v in list(cb_map.items())
+                    if v.get("expires_at") and v["expires_at"] < now
+                ]
+                for k in expired:
+                    cb_map.pop(k, None)
+
+                cb_map[tok] = callback_data
 
         self._callback_tokens = getattr(self, "_callback_tokens", [])
         self._callback_tokens.append(tok)
 
         if allow_user is not None:
-            if not hasattr(self.kernel, "callback_permissions"):
+            allow_callback_user = getattr(
+                self.kernel, "allow_inline_callback_user", None
+            )
+            if not (is_kernel_proxy and callable(allow_callback_user)) and not hasattr(
+                self.kernel, "callback_permissions"
+            ):
                 from ..base.permissions import CallbackPermissionManager
 
                 self.kernel.callback_permissions = CallbackPermissionManager()
 
             if allow_user == "all":
-                cb_map[tok]["allow_all"] = True
+                callback_data["allow_all"] = True
             elif isinstance(allow_user, int):
-                self.kernel.callback_permissions.allow(allow_user, tok, allow_ttl)
+                if is_kernel_proxy and callable(allow_callback_user):
+                    allow_callback_user(allow_user, tok, allow_ttl)
+                else:
+                    self.kernel.callback_permissions.allow(allow_user, tok, allow_ttl)
             elif isinstance(allow_user, list):
                 for uid in allow_user:
-                    self.kernel.callback_permissions.allow(uid, tok, allow_ttl)
+                    if is_kernel_proxy and callable(allow_callback_user):
+                        allow_callback_user(uid, tok, allow_ttl)
+                    else:
+                        self.kernel.callback_permissions.allow(uid, tok, allow_ttl)
+
+            if allow_user == "all" and is_kernel_proxy and callable(store_callback):
+                store_callback(tok, callback_data)
 
         return Button.inline(
             text, tok.encode(), style=style, icon=icon, **button_kwargs
@@ -1024,9 +1062,15 @@ class ModuleBase(ABC):
                     saved = await get_config(self.name)
                     if saved:
                         self._config.from_dict(saved)
-                if not hasattr(self.kernel, "_live_module_configs"):
+                is_kernel_proxy = type(self.kernel).__name__ == "ModuleKernelProxy"
+                set_live_config = getattr(self.kernel, "set_live_module_config", None)
+                if is_kernel_proxy and callable(set_live_config):
+                    set_live_config(self.name, self._config)
+                elif not hasattr(self.kernel, "_live_module_configs"):
                     self.kernel._live_module_configs = {}
-                self.kernel._live_module_configs[self.name] = self._config
+                    self.kernel._live_module_configs[self.name] = self._config
+                else:
+                    self.kernel._live_module_configs[self.name] = self._config
             except Exception as e:
                 self.log.warning(f"Failed to load config for {self.name}: {e}")
 
@@ -1138,7 +1182,11 @@ class ModuleBase(ABC):
                 save_config = getattr(self.kernel, "save_module_config", None)
                 if save_config:
                     await save_config(self.name, self._config.to_dict())
-                if hasattr(self.kernel, "_live_module_configs"):
+                is_kernel_proxy = type(self.kernel).__name__ == "ModuleKernelProxy"
+                set_live_config = getattr(self.kernel, "set_live_module_config", None)
+                if is_kernel_proxy and callable(set_live_config):
+                    set_live_config(self.name, self._config)
+                elif hasattr(self.kernel, "_live_module_configs"):
                     self.kernel._live_module_configs[self.name] = self._config
             except Exception as e:
                 self.log.warning(f"Failed to save config for {self.name}: {e}")

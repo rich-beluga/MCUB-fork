@@ -7,13 +7,14 @@ import asyncio
 import importlib.util
 import inspect
 import os
-from typing import TYPE_CHECKING, Any
 import sys
+from collections.abc import Callable
+from typing import TYPE_CHECKING, cast
 
 from ..utils.exceptions import CommandConflictError
 
 if TYPE_CHECKING:
-    from kernel import Kernel
+    pass
 
 
 class SystemLoaderMixin:
@@ -24,7 +25,6 @@ class SystemLoaderMixin:
 
     async def load_system_modules(self) -> None:
         """Load all .py files from the system modules directory."""
-        import os
 
         k = self.k
 
@@ -35,6 +35,7 @@ class SystemLoaderMixin:
                 # Packaging marker; not an actual system module
                 continue
             module_name = file_name[:-3]
+            original_module_name = module_name
             file_path = os.path.join(k.MODULES_DIR, file_name)
             try:
                 with open(file_path, encoding="utf-8") as f:
@@ -43,7 +44,9 @@ class SystemLoaderMixin:
                 await self.pre_install_requirements(code, module_name)
 
                 spec = importlib.util.spec_from_file_location(module_name, file_path)
-                module = self._build_module(spec, file_path, module_name)
+                module = self._build_module(
+                    spec, file_path, module_name, is_system=True
+                )
                 sys.modules[module_name] = module
 
                 k.set_loading_module(module_name, "system")
@@ -62,8 +65,6 @@ class SystemLoaderMixin:
                             and class_display_name != module_name
                             and class_display_name not in k.system_modules
                         ):
-                            import os
-
                             old_path = file_path
                             new_path = os.path.join(
                                 k.MODULES_DIR, f"{class_display_name}.py"
@@ -80,6 +81,20 @@ class SystemLoaderMixin:
                                     k.logger.warning(
                                         f"Failed to rename system module file: {e}"
                                     )
+
+                            rename_sys_module = getattr(
+                                self, "_rename_sys_module_entry", None
+                            )
+                            if callable(rename_sys_module):
+                                cast(Callable[..., None], rename_sys_module)(
+                                    original_module_name,
+                                    class_display_name,
+                                    module,
+                                    file_path,
+                                )
+                            else:
+                                sys.modules.pop(original_module_name, None)
+                                sys.modules[class_display_name] = module
 
                             module_name = class_display_name
 

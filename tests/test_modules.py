@@ -205,12 +205,12 @@ class TestUpdatesModule:
 
         assert updates_module is not None
 
-    def test_updates_has_register(self):
-        """Test updates module has register function"""
+    def test_updates_has_module_class(self):
+        """Test updates module exposes its ModuleBase class"""
         import modules.updates as updates_module
 
-        assert hasattr(updates_module, "register")
-        assert callable(updates_module.register)
+        assert hasattr(updates_module, "UpdatesMod")
+        assert callable(updates_module.UpdatesMod)
 
 
 class TestSettingsModule:

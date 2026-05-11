@@ -109,6 +109,7 @@ def _detect_module_type(source_code: str) -> str:
     hikka_score = 0
     geek_score = 0
     native_score = 0
+    hikka_loader_aliases: set[str] = set()
     native_loader_aliases: set[str] = set()
     native_module_base_names: set[str] = set()
     native_decorator_names: set[str] = set()
@@ -139,8 +140,24 @@ def _detect_module_type(source_code: str) -> str:
 
     def _is_native_decorator_expr(chain: list[str]) -> bool:
         if len(chain) >= 2 and _is_native_loader_alias(chain):
-            return chain[1] == "command"
+            return chain[1] in {
+                "bot_command",
+                "callback",
+                "command",
+                "event",
+                "inline_temp",
+                "loop",
+                "method",
+                "on_install",
+                "owner",
+                "permission",
+                "uninstall",
+                "watcher",
+            }
         return len(chain) == 1 and chain[0] in native_decorator_names
+
+    def _is_hikka_loader_expr(chain: list[str]) -> bool:
+        return bool(chain) and chain[0] in hikka_loader_aliases
 
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
@@ -148,6 +165,17 @@ def _detect_module_type(source_code: str) -> str:
             imported = {alias.name for alias in node.names}
             if node.level > 0 and "loader" in imported:
                 hikka_score += 1
+                for alias in node.names:
+                    if alias.name == "loader":
+                        hikka_loader_aliases.add(_alias_name(alias))
+            if (
+                module in {"hikka", "hikka.loader", "heroku", "heroku.loader"}
+                and "loader" in imported
+            ):
+                hikka_score += 1
+                for alias in node.names:
+                    if alias.name == "loader":
+                        hikka_loader_aliases.add(_alias_name(alias))
             if module.startswith("core.lib.loader"):
                 native_score += 1
             if _is_native_module_base_import(module):
@@ -184,7 +212,7 @@ def _detect_module_type(source_code: str) -> str:
                     continue
                 if (
                     len(chain) >= 2
-                    and chain[0] == "loader"
+                    and _is_hikka_loader_expr(chain)
                     and chain[1]
                     in {
                         "tds",
@@ -202,7 +230,7 @@ def _detect_module_type(source_code: str) -> str:
                     continue
                 if (
                     len(chain) >= 2
-                    and chain[0] == "loader"
+                    and _is_hikka_loader_expr(chain)
                     and chain[1]
                     in {
                         "Module",
@@ -221,10 +249,10 @@ def _detect_module_type(source_code: str) -> str:
 
         elif isinstance(node, ast.Attribute):
             chain = _attr_chain(node)
-            if chain[:2] == ["loader", "ModuleConfig"] or chain[:2] == [
-                "loader",
-                "LibraryConfig",
-            ]:
+            if _is_hikka_loader_expr(chain) and (
+                chain[:2] == [chain[0], "ModuleConfig"]
+                or chain[:2] == [chain[0], "LibraryConfig"]
+            ):
                 hikka_score += 1
             if chain[:3] == ["self", "inline", "_bot"]:
                 geek_score += 1
@@ -579,8 +607,31 @@ def _create_web_stub(parent_pkg_name: str) -> tuple[types.ModuleType, types.Modu
     return web_mod, core_mod
 
 
+def _create_herokutl_events_module() -> types.ModuleType:
+    try:
+        from telethon import events as telethon_events
+
+        return telethon_events
+    except Exception:
+        events_mod = types.ModuleType("herokutl.events")
+        events_mod.__package__ = "herokutl"
+        return events_mod
+
+
 def _ensure_herokutl_stub() -> None:
     if "herokutl" in sys.modules:
+        herokutl_mod = sys.modules["herokutl"]
+        if not hasattr(herokutl_mod, "events"):
+            events_mod = _create_herokutl_events_module()
+            herokutl_mod.events = events_mod
+            sys.modules["herokutl.events"] = events_mod
+        if (
+            not hasattr(herokutl_mod, "functions")
+            and "herokutl.tl.functions" in sys.modules
+        ):
+            functions_mod = sys.modules["herokutl.tl.functions"]
+            herokutl_mod.functions = functions_mod
+            sys.modules["herokutl.functions"] = functions_mod
         return
 
     herokutl_mod = types.ModuleType("herokutl")
@@ -642,8 +693,17 @@ def _ensure_herokutl_stub() -> None:
     extensions_mod.__path__ = []
     html_mod = types.ModuleType("herokutl.extensions.html")
     html_mod.CUSTOM_EMOJIS = {}
-    html_mod.parse = lambda text: (text, [])
+    try:
+        from telethon.extensions import html as telethon_html
+
+        html_mod.parse = telethon_html.parse
+        html_mod.unparse = telethon_html.unparse
+    except Exception:
+        html_mod.parse = lambda text: (text, [])
+        html_mod.unparse = lambda text, entities=None: text
     extensions_mod.html = html_mod
+
+    events_mod = _create_herokutl_events_module()
 
     hints_mod = types.ModuleType("herokutl.hints")
     hints_mod.Entity = Any
@@ -811,6 +871,7 @@ def _ensure_herokutl_stub() -> None:
         setattr(tl_functions, _group_name, _group_mod)
 
     herokutl_mod.errors = errors_mod
+    herokutl_mod.events = events_mod
     herokutl_mod.extensions = extensions_mod
     herokutl_mod.hints = hints_mod
     herokutl_mod.types = types_mod
@@ -818,12 +879,14 @@ def _ensure_herokutl_stub() -> None:
     herokutl_mod.sessions = sessions_mod
     herokutl_mod.tl = tl_mod
     herokutl_mod.custom = custom_mod
+    herokutl_mod.functions = tl_functions
     tl_mod.types = tl_types
     tl_mod.functions = tl_functions
     tl_mod.custom = tl_custom_mod
 
     sys.modules["herokutl"] = herokutl_mod
     sys.modules["herokutl.errors"] = errors_mod
+    sys.modules["herokutl.events"] = events_mod
     sys.modules["herokutl.errors.common"] = errors_common_mod
     sys.modules["herokutl.errors.rpcerrorlist"] = errors_rpc_mod
     sys.modules["herokutl.extensions"] = extensions_mod
@@ -835,6 +898,7 @@ def _ensure_herokutl_stub() -> None:
     sys.modules["herokutl.tl"] = tl_mod
     sys.modules["herokutl.tl.types"] = tl_types
     sys.modules["herokutl.tl.functions"] = tl_functions
+    sys.modules["herokutl.functions"] = tl_functions
     sys.modules["herokutl.tl.functions.channels"] = tl_func_channels
     sys.modules["herokutl.tl.functions.contacts"] = tl_func_contacts
     sys.modules["herokutl.tl.functions.messages"] = tl_func_messages
@@ -1891,7 +1955,13 @@ async def load_hikka_module(
                         from .inline_types import CompatMessage
 
                         wrapped_event = (
-                            CompatMessage(event) if hasattr(event, "edit") else event
+                            CompatMessage(
+                                event,
+                                kernel=kernel,
+                                inline_proxy=getattr(instance, "inline", None),
+                            )
+                            if hasattr(event, "edit")
+                            else event
                         )
                         await _m(wrapped_event)
                     except Exception as _e:
@@ -1916,7 +1986,13 @@ async def load_hikka_module(
                 if getattr(instance, "_self_suspended", False):
                     return
                 wrapped_event = (
-                    CompatMessage(event) if hasattr(event, "edit") else event
+                    CompatMessage(
+                        event,
+                        kernel=kernel,
+                        inline_proxy=getattr(instance, "inline", None),
+                    )
+                    if hasattr(event, "edit")
+                    else event
                 )
                 return await _maybe_await(_method(wrapped_event))
 
@@ -1993,6 +2069,9 @@ async def load_hikka_module(
             from .inline_types import BotInlineCall, InlineCall
 
             inline_proxy = getattr(instance, "inline", None)
+            data_str = event.data.decode() if event.data else ""
+            payload = getattr(inline_proxy, "_custom_map", {}).get(data_str, {})
+            unit_id = payload.get("unit_id", "") if isinstance(payload, dict) else ""
             is_bot_message = (
                 getattr(getattr(event, "message", None), "chat", None) is not None
             )
@@ -2000,12 +2079,12 @@ async def load_hikka_module(
                 BotInlineCall(
                     event,
                     inline_proxy=inline_proxy,
-                    unit_id="",
+                    unit_id=unit_id,
                 )
                 if is_bot_message
                 else InlineCall(
-                    event.data.decode() if event.data else "",
-                    unit_id="",
+                    data_str,
+                    unit_id=unit_id,
                     inline_proxy=inline_proxy,
                     original_call=event,
                     inline_message_id=getattr(event, "inline_message_id", None),
@@ -2022,7 +2101,16 @@ async def load_hikka_module(
                     if hasattr(call_obj, "message") and call_obj.message is not None:
                         orig_msg = getattr(call_obj.message, "_message", None)
                         if orig_msg is not None:
-                            call_obj.message = CompatMessage(orig_msg)
+                            call_obj.message = CompatMessage(
+                                orig_msg,
+                                kernel=kernel,
+                                inline_proxy=inline_proxy,
+                                unit_id=getattr(call_obj.message, "unit_id", ""),
+                                chat_id=getattr(call_obj.message, "chat_id", None),
+                                message_id=getattr(
+                                    call_obj.message, "message_id", None
+                                ),
+                            )
                     await _maybe_await(_handler(call_obj))
                 except Exception as _e:
                     kernel.logger.error(
@@ -2053,7 +2141,13 @@ async def load_hikka_module(
                     from .inline_types import CompatMessage
 
                     wrapped_event = (
-                        CompatMessage(event) if hasattr(event, "edit") else event
+                        CompatMessage(
+                            event,
+                            kernel=kernel,
+                            inline_proxy=getattr(instance, "inline", None),
+                        )
+                        if hasattr(event, "edit")
+                        else event
                     )
                     await _maybe_await(_wm(wrapped_event))
                 except Exception as _e:

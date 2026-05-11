@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from kernel import Kernel
+    pass
 
 
 class ModuleUnloaderMixin:
@@ -45,7 +45,6 @@ class ModuleUnloaderMixin:
         instance = getattr(module, "_class_instance", None)
         if instance is not None:
             if instance._loaded:
-                instance._loaded = False
                 try:
                     if inspect.iscoroutinefunction(instance.on_unload):
                         await instance.on_unload()
@@ -53,8 +52,10 @@ class ModuleUnloaderMixin:
                         result = instance.on_unload()
                         if asyncio.iscoroutine(result):
                             await result
+                    instance._loaded = False
                     k.logger.debug(f"on_unload called for class module: {module_name}")
                 except Exception as e:
+                    instance._loaded = False
                     k.logger.error(f"on_unload error in {module_name}: {e}")
 
                 cleanup_callback_tokens = getattr(
@@ -127,66 +128,57 @@ class ModuleUnloaderMixin:
                         f"Error removing event handler in {module_name}: {e}"
                     )
 
-        # Remove raw client.on() handlers (Telethon-MCUB automatic tracking)
-        try:
-            if hasattr(k.client, "remove_module_handlers"):
-                k.client.remove_module_handlers(module_name)
-            elif hasattr(k.client, "_event_builders") and k.client._event_builders:
-                # Fallback for standard Telethon: remove by scanning _event_builders
-                module = k.loaded_modules.get(module_name) or k.system_modules.get(
-                    module_name
-                )
-                if module:
-                    reg = getattr(module, "register", None)
-                    if reg and hasattr(reg, "__event_handlers__"):
-                        for entry in reg.__event_handlers__:
-                            handler = entry[0]
-                            event_obj = entry[1] if len(entry) > 1 else None
-                            try:
-                                k.client.remove_event_handler(handler, event_obj)
-                            except Exception:
-                                pass
+            central_register = getattr(k, "register", None)
+            if central_register is not None:
+                central_watchers = getattr(central_register, "_all_watchers", None)
+                if isinstance(central_watchers, list):
+                    before_watchers = len(central_watchers)
+                    central_watchers[:] = [
+                        entry
+                        for entry in central_watchers
+                        if (entry[3] if len(entry) > 3 else {}).get("module")
+                        != module_name
+                    ]
+                    removed_watchers = before_watchers - len(central_watchers)
+                    if removed_watchers:
+                        k.logger.debug(
+                            "[loader.unregister] pruned central watchers module=%r count=%d",
+                            module_name,
+                            removed_watchers,
+                        )
 
-            if hasattr(k, "bot_client") and k.bot_client:
-                if hasattr(k.bot_client, "remove_module_handlers"):
-                    k.bot_client.remove_module_handlers(module_name)
-                elif (
-                    hasattr(k.bot_client, "_event_builders")
-                    and k.bot_client._event_builders
-                ):
-                    # Fallback for standard Telethon bot_client
-                    module = k.loaded_modules.get(module_name) or k.system_modules.get(
-                        module_name
-                    )
-                    if module:
-                        reg = getattr(module, "register", None)
-                        if reg and hasattr(reg, "__event_handlers__"):
-                            for entry in reg.__event_handlers__:
-                                handler = entry[0]
-                                event_obj = entry[1] if len(entry) > 1 else None
-                                try:
-                                    k.bot_client.remove_event_handler(
-                                        handler, event_obj
-                                    )
-                                except Exception:
-                                    pass
-        except Exception as e:
-            k.logger.error(f"Error removing module raw handlers in {module_name}: {e}")
+                central_events = getattr(central_register, "_all_event_handlers", None)
+                if isinstance(central_events, list):
+                    before_events = len(central_events)
+                    central_events[:] = [
+                        entry
+                        for entry in central_events
+                        if (
+                            (entry[3] if len(entry) > 3 else {}).get("module")
+                            or getattr(entry[0], "__module__", None)
+                        )
+                        != module_name
+                    ]
+                    removed_events = before_events - len(central_events)
+                    if removed_events:
+                        k.logger.debug(
+                            "[loader.unregister] pruned central events module=%r count=%d",
+                            module_name,
+                            removed_events,
+                        )
+
+        # Do not call Telethon-MCUB ``remove_module_handlers(module_name)`` here.
+        # MCUB has already removed exact callbacks tracked in the module
+        # register above.  A broad client-side cleanup can invalidate unrelated
+        # core handlers or leave Telethon's type-dispatch cache incomplete during
+        # reload/install flows.
 
         uninstall = getattr(reg, "__uninstall__", None)
         if uninstall is not None:
             try:
                 result = uninstall(k)
                 if asyncio.iscoroutine(result):
-                    try:
-                        loop = asyncio.get_running_loop()
-                        asyncio.ensure_future(result)
-                    except RuntimeError:
-                        k.logger.debug(
-                            "[loader.unregister] uninstall-asyncio-run module=%r",
-                            module_name,
-                        )
-                        asyncio.run(result)
+                    await result
             except Exception as e:
                 k.logger.error(f"Error in uninstall callback of {module_name}: {e}")
         else:

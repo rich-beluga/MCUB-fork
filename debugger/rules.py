@@ -63,6 +63,9 @@ class EventEditWithButtonsRule(WarningRule):
     ) -> list[Warning]:
         warnings = []
 
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return warnings
+
         for child in ast.walk(node):
             if isinstance(child, ast.Call):
                 if self._is_event_edit_call(child):
@@ -163,6 +166,9 @@ class EventEditWithReplyMarkupRule(WarningRule):
         self, analyzer: "SourceAnalyzer", node: ast.FunctionDef | ast.AsyncFunctionDef
     ) -> list[Warning]:
         warnings = []
+
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return warnings
 
         for child in ast.walk(node):
             if isinstance(child, ast.Call):
@@ -507,7 +513,7 @@ class AsyncWithoutAwaitRule(WarningRule):
 
         has_await = False
         for child in ast.walk(node):
-            if isinstance(child, ast.Await):
+            if isinstance(child, (ast.Await, ast.AsyncFor, ast.AsyncWith)):
                 has_await = True
                 break
 
@@ -900,6 +906,9 @@ class AsyncFunctionRequiredRule(WarningRule):
         self, analyzer: "SourceAnalyzer", node: ast.FunctionDef | ast.AsyncFunctionDef
     ) -> list[Warning]:
         warnings = []
+
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return warnings
 
         if not isinstance(node, ast.AsyncFunctionDef):
             warnings.append(
@@ -1802,12 +1811,15 @@ class BareOrUnsafeExceptRule(WarningRule):
 
     rule_id = "MCUB027"
     severity = "warning"
-    message = "try-except block should call kernel.handle_error() or kernel.logger.error(), not silently swallow exceptions."
+    message = "Broad try-except blocks should log/raise errors; specific validation exceptions may answer the user directly."
 
     def check(
         self, analyzer: "SourceAnalyzer", node: ast.FunctionDef | ast.AsyncFunctionDef
     ) -> list[Warning]:
         warnings = []
+
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return warnings
 
         for child in ast.walk(node):
             if isinstance(child, ast.Try):
@@ -1825,7 +1837,7 @@ class BareOrUnsafeExceptRule(WarningRule):
                                 fix_suggestion="Use 'except Exception as e:' and handle error properly",
                             )
                         )
-                    elif not self._has_error_handling(handler, analyzer):
+                    elif not self._has_error_handling(handler, analyzer, node, child):
                         warnings.append(
                             Warning(
                                 rule_id=self.rule_id,
@@ -1835,7 +1847,7 @@ class BareOrUnsafeExceptRule(WarningRule):
                                 line=handler.lineno,
                                 column=handler.col_offset + 1,
                                 code_snippet=analyzer.get_code_snippet(handler.lineno),
-                                fix_suggestion="Add kernel.handle_error(e, source=..., event=event) or kernel.logger.error(...)",
+                                fix_suggestion="For broad exceptions add await kernel.handle_error(...), kernel.logger.exception(...), or re-raise. For ValueError/User input errors, answer the user with event.reply/edit/respond/answer.",
                             )
                         )
         return warnings
@@ -1844,11 +1856,180 @@ class BareOrUnsafeExceptRule(WarningRule):
         return handler.type is None
 
     def _has_error_handling(
-        self, handler: ast.ExceptHandler, analyzer: "SourceAnalyzer"
+        self,
+        handler: ast.ExceptHandler,
+        analyzer: "SourceAnalyzer",
+        function_node: ast.FunctionDef | ast.AsyncFunctionDef,
+        try_node: ast.Try,
     ) -> bool:
+        if self._is_best_effort_feedback_fallback(handler, try_node):
+            return True
+
+        if self._is_empty_handler(handler):
+            if self._is_safe_fallback_except(handler, function_node, try_node):
+                return True
+            return False
+
+        broad_exception = self._is_broad_exception(handler)
         for stmt in handler.body:
             if self._contains_error_handling(stmt, analyzer):
                 return True
+            if not broad_exception and self._contains_user_feedback(stmt):
+                return True
+        if self._is_safe_fallback_except(handler, function_node, try_node):
+            return True
+        return False
+
+    def _is_empty_handler(self, handler: ast.ExceptHandler) -> bool:
+        meaningful = [stmt for stmt in handler.body if not isinstance(stmt, ast.Expr)]
+        if not meaningful:
+            return True
+        return all(isinstance(stmt, ast.Pass) for stmt in meaningful)
+
+    def _is_broad_exception(self, handler: ast.ExceptHandler) -> bool:
+        if handler.type is None:
+            return True
+        if isinstance(handler.type, ast.Name):
+            return handler.type.id in {"Exception", "BaseException"}
+        if isinstance(handler.type, ast.Tuple):
+            return any(
+                isinstance(elt, ast.Name) and elt.id in {"Exception", "BaseException"}
+                for elt in handler.type.elts
+            )
+        return False
+
+    def _is_safe_fallback_except(
+        self,
+        handler: ast.ExceptHandler,
+        function_node: ast.FunctionDef | ast.AsyncFunctionDef,
+        try_node: ast.Try,
+    ) -> bool:
+        """Allow broad exceptions in non-handler helper fallback code.
+
+        MCUB027 is intended to catch swallowed runtime errors in commands and event
+        handlers. Built-in modules also contain small helper probes (git branch,
+        update availability, system stats) where a broad exception intentionally
+        falls back to a safe default. Those helpers should not require noisy logs.
+        """
+        if self._is_interactive_handler(function_node):
+            return False
+
+        if any(self._contains_user_feedback(stmt) for stmt in handler.body):
+            return False
+
+        if self._handler_returns_safe_default(handler):
+            return True
+
+        if self._handler_only_assigns_fallback_values(handler):
+            return True
+
+        if self._handler_falls_through_to_safe_return(handler, function_node, try_node):
+            return True
+
+        return False
+
+    def _is_best_effort_feedback_fallback(
+        self, handler: ast.ExceptHandler, try_node: ast.Try
+    ) -> bool:
+        if not self._is_empty_handler(handler):
+            return False
+        return any(self._contains_user_feedback(stmt) for stmt in try_node.body)
+
+    def _is_interactive_handler(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef
+    ) -> bool:
+        decorator_names = {
+            self._attribute_path(dec.func if isinstance(dec, ast.Call) else dec)
+            for dec in node.decorator_list
+        }
+        flattened = {".".join(name) for name in decorator_names if name is not None}
+        if any(
+            name in {"command", "bot_command"}
+            or name.endswith(".command")
+            or name.endswith(".bot_command")
+            or name.endswith(".event")
+            for name in flattened
+        ):
+            return True
+        return any(
+            arg.arg in {"event", "message", "call", "query"} for arg in node.args.args
+        )
+
+    def _handler_returns_safe_default(self, handler: ast.ExceptHandler) -> bool:
+        meaningful = [stmt for stmt in handler.body if not isinstance(stmt, ast.Pass)]
+        return bool(meaningful) and all(
+            isinstance(stmt, ast.Return) and self._is_safe_default_value(stmt.value)
+            for stmt in meaningful
+        )
+
+    def _handler_only_assigns_fallback_values(self, handler: ast.ExceptHandler) -> bool:
+        meaningful = [stmt for stmt in handler.body if not isinstance(stmt, ast.Pass)]
+        if not meaningful:
+            return False
+        safe_stmt_types = (
+            ast.Assign,
+            ast.AnnAssign,
+            ast.AugAssign,
+            ast.Try,
+            ast.If,
+            ast.For,
+            ast.With,
+        )
+        return all(isinstance(stmt, safe_stmt_types) for stmt in meaningful)
+
+    def _handler_falls_through_to_safe_return(
+        self,
+        handler: ast.ExceptHandler,
+        function_node: ast.FunctionDef | ast.AsyncFunctionDef,
+        try_node: ast.Try,
+    ) -> bool:
+        if not all(isinstance(stmt, ast.Pass) for stmt in handler.body):
+            return False
+        try:
+            try_index = function_node.body.index(try_node)
+        except ValueError:
+            return any(
+                isinstance(stmt, ast.Return)
+                and self._is_safe_fallback_return_value(stmt.value)
+                for stmt in function_node.body
+            )
+        for stmt in function_node.body[try_index + 1 :]:
+            if isinstance(stmt, ast.Return):
+                return self._is_safe_fallback_return_value(stmt.value)
+            if not isinstance(stmt, (ast.Expr, ast.Assign, ast.AnnAssign)):
+                return False
+        return False
+
+    def _is_safe_fallback_return_value(self, node: ast.AST | None) -> bool:
+        if self._is_safe_default_value(node):
+            return True
+        if isinstance(node, ast.Name):
+            return True
+        if isinstance(node, (ast.Tuple, ast.List)):
+            return all(
+                self._is_safe_default_value(elt) or isinstance(elt, ast.Name)
+                for elt in node.elts
+            )
+        return False
+
+    def _is_safe_default_value(self, node: ast.AST | None) -> bool:
+        if node is None:
+            return True
+        if isinstance(node, ast.Constant):
+            return node.value in {None, False, True} or isinstance(
+                node.value, (str, int, float)
+            )
+        if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+            return len(node.elts) == 0 or all(
+                self._is_safe_default_value(elt) for elt in node.elts
+            )
+        if isinstance(node, ast.Dict):
+            return len(node.keys) == 0
+        if isinstance(node, ast.Name):
+            return node.id in {"None", "False", "True"}
+        if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Attribute):
+                return node.func.attr == "strings"
         return False
 
     def _contains_error_handling(
@@ -1866,9 +2047,30 @@ class BareOrUnsafeExceptRule(WarningRule):
                 return True
         return False
 
+    def _contains_user_feedback(self, node: ast.AST) -> bool:
+        for child in ast.walk(node):
+            call = None
+            if isinstance(child, ast.Await) and isinstance(child.value, ast.Call):
+                call = child.value
+            elif isinstance(child, ast.Call):
+                call = child
+            if call and isinstance(call.func, ast.Attribute):
+                if call.func.attr in {"reply", "respond", "edit", "answer"}:
+                    receiver = self._attribute_path(call.func.value)
+                    if receiver and receiver[-1] in {
+                        "event",
+                        "message",
+                        "call",
+                        "query",
+                        "msg",
+                    }:
+                        return True
+        return False
+
     def _is_kernel_error_call(self, node: ast.Call) -> bool:
         if isinstance(node.func, ast.Attribute):
-            if node.func.attr in (
+            method = node.func.attr
+            if method in (
                 "handle_error",
                 "error",
                 "warning",
@@ -1877,18 +2079,35 @@ class BareOrUnsafeExceptRule(WarningRule):
                 "critical",
                 "exception",
             ):
-                if isinstance(node.func.value, ast.Attribute):
-                    if node.func.value.attr == "logger":
-                        if isinstance(node.func.value.value, ast.Name):
-                            if node.func.value.value.id == "kernel":
-                                return True
-                elif isinstance(node.func.value, ast.Name):
-                    if (
-                        node.func.value.id == "kernel"
-                        and node.func.attr == "handle_error"
-                    ):
-                        return True
+                receiver = self._attribute_path(node.func.value)
+                if not receiver:
+                    return False
+
+                if method == "handle_error" and receiver in (
+                    ("kernel",),
+                    ("self", "kernel"),
+                ):
+                    return True
+
+                if receiver in (
+                    ("kernel", "logger"),
+                    ("self", "kernel", "logger"),
+                    ("self", "log"),
+                    ("logger",),
+                    ("log",),
+                ):
+                    return True
         return False
+
+    def _attribute_path(self, node: ast.AST) -> tuple[str, ...] | None:
+        parts: list[str] = []
+        while isinstance(node, ast.Attribute):
+            parts.append(node.attr)
+            node = node.value
+        if isinstance(node, ast.Name):
+            parts.append(node.id)
+            return tuple(reversed(parts))
+        return None
 
 
 class LoggerWithoutAwaitRule(WarningRule):
@@ -1924,10 +2143,20 @@ class LoggerWithoutAwaitRule(WarningRule):
     def _is_kernel_handle_error_call(self, node: ast.Call) -> bool:
         if isinstance(node.func, ast.Attribute):
             if node.func.attr == "handle_error":
-                if isinstance(node.func.value, ast.Name):
-                    if node.func.value.id == "kernel":
-                        return True
+                receiver = self._attribute_path(node.func.value)
+                if receiver in (("kernel",), ("self", "kernel")):
+                    return True
         return False
+
+    def _attribute_path(self, node: ast.AST) -> tuple[str, ...] | None:
+        parts: list[str] = []
+        while isinstance(node, ast.Attribute):
+            parts.append(node.attr)
+            node = node.value
+        if isinstance(node, ast.Name):
+            parts.append(node.id)
+            return tuple(reversed(parts))
+        return None
 
     def _has_await_parent(self, node: ast.Call, parent: ast.AST) -> bool:
         for child in ast.walk(parent):
@@ -2233,7 +2462,7 @@ class ClassStyleDecoratorsRule(WarningRule):
             return warnings
 
         for item in node.body:
-            if isinstance(item, ast.FunctionDef):
+            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 for dec in item.decorator_list:
                     dec_name = self._get_decorator_name(dec)
                     if (
@@ -2448,20 +2677,35 @@ class ClassStyleCommandDecoratorRule(WarningRule):
         if not has_base:
             return warnings
 
-        has_command = False
+        has_handler = False
         for item in node.body:
-            if isinstance(item, ast.FunctionDef):
+            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 for dec in item.decorator_list:
-                    if isinstance(dec, ast.Name):
-                        if dec.id == "command":
-                            has_command = True
+                    dec_func = dec.func if isinstance(dec, ast.Call) else dec
+                    if isinstance(dec_func, ast.Name):
+                        if dec_func.id in {
+                            "command",
+                            "bot_command",
+                            "callback",
+                            "event",
+                            "watcher",
+                            "loop",
+                        }:
+                            has_handler = True
                             break
-                    elif isinstance(dec, ast.Attribute):
-                        if dec.attr == "command":
-                            has_command = True
+                    elif isinstance(dec_func, ast.Attribute):
+                        if dec_func.attr in {
+                            "command",
+                            "bot_command",
+                            "callback",
+                            "event",
+                            "watcher",
+                            "loop",
+                        }:
+                            has_handler = True
                             break
 
-        if not has_command:
+        if not has_handler:
             warnings.append(
                 Warning(
                     rule_id=self.rule_id,
@@ -2471,7 +2715,7 @@ class ClassStyleCommandDecoratorRule(WarningRule):
                     line=node.lineno,
                     column=node.col_offset + 1,
                     code_snippet=analyzer.get_code_snippet(node.lineno),
-                    fix_suggestion="@command('cmd') async def handler(self, event):",
+                    fix_suggestion="Add @command/@bot_command/@callback/@event decorator to at least one handler method",
                 )
             )
 
@@ -2490,42 +2734,10 @@ class ClassStyleMethodNamingRule(WarningRule):
     def check(
         self, analyzer: "SourceAnalyzer", node: ast.FunctionDef | ast.AsyncFunctionDef
     ) -> list[Warning]:
-        warnings = []
-        if not isinstance(node, ast.ClassDef):
-            return warnings
-
-        has_base = False
-
-        for base in node.bases:
-            if isinstance(base, ast.Name):
-                if base.id == "ModuleBase":
-                    has_base = True
-            elif isinstance(base, ast.Attribute):
-                if base.attr == "ModuleBase":
-                    has_base = True
-
-        if not has_base:
-            return warnings
-
-        for item in node.body:
-            if isinstance(item, ast.FunctionDef):
-                name = item.name
-                if not any(name.startswith(prefix) for prefix in self._valid_prefixes):
-                    if not name.startswith("_"):
-                        warnings.append(
-                            Warning(
-                                rule_id=self.rule_id,
-                                severity=self.severity,
-                                message=self.message.format(name=name),
-                                file_path=analyzer.file_path,
-                                line=item.lineno,
-                                column=item.col_offset + 1,
-                                code_snippet=analyzer.get_code_snippet(item.lineno),
-                                fix_suggestion="Rename to cmd_* or handler_*",
-                            )
-                        )
-
-        return warnings
+        # MCUB class-style modules intentionally allow arbitrary method names when
+        # routing is declared by @command/@bot_command/@callback decorators.
+        # Enforcing prefixes on helper methods creates noisy false positives.
+        return []
 
 
 class ClassStyleDocstringRule(WarningRule):
@@ -2555,12 +2767,7 @@ class ClassStyleDocstringRule(WarningRule):
         if not has_base:
             return warnings
 
-        has_docstring = False
-        if node.docstring:
-            has_docstring = True
-        elif node.body and isinstance(node.body[0], ast.Expr):
-            if isinstance(node.body[0].value, ast.Constant):
-                has_docstring = True
+        has_docstring = ast.get_docstring(node) is not None
 
         if not has_docstring:
             warnings.append(

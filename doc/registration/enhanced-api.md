@@ -16,7 +16,7 @@ async def setup(kernel):
     kernel.logger.info("module initialised")
 ```
 
-### `@kernel.register.command(pattern, alias=None, more=None)`
+### `@kernel.register.command(pattern, alias=None, more=None, doc=None, doc_ru=None, doc_en=None)`
 
 Register a userbot command.
 
@@ -26,7 +26,14 @@ async def ping(event):
     await event.edit("Pong!")
 ```
 
-### `@kernel.register.bot_command(pattern)`
+**Notes:**
+- `pattern` is normalized: the custom prefix and trailing `$` are stripped.
+- `alias` can be a string or a list of strings.
+- `doc`, `doc_ru`, and `doc_en` are stored in `kernel.command_docs` and shown by command/help tooling.
+- Raises `CommandConflictError` if the command or alias is already registered.
+- Raises `ValueError` if called while no module is being loaded.
+
+### `@kernel.register.bot_command(pattern, doc=None, doc_ru=None, doc_en=None)`
 
 Register a Telegram native `/command` (requires bot client).
 
@@ -35,6 +42,26 @@ Register a Telegram native `/command` (requires bot client).
 async def start(event):
     await event.respond("Hello!")
 ```
+
+`doc`, `doc_ru`, and `doc_en` are stored in `kernel.bot_command_docs`. Duplicate bot commands raise `CommandConflictError`.
+
+### `kernel.register.inline_temp(func, ttl=300, article=None, data=None, allow_user=None, allow_ttl=100)`
+
+Register a temporary inline command handler and return an 8-character form id. This is a normal method, not a decorator: pass the handler callable as the first argument.
+
+```python
+async def handle_search(event, args, data=None):
+    await event.answer(f"Search: {args}")
+
+form_id = kernel.register.inline_temp(
+    handle_search,
+    ttl=600,
+    article=lambda e: e.builder.article("Search", text="Search..."),
+    data={"source": "module"},
+)
+```
+
+When the user enters `@bot <form_id> query` and sends the article, MCUB calls the handler as `(event)`, `(event, args)`, or `(event, args, data)` depending on its signature.
 
 ### `@kernel.register.event(event_type, *args, bot_client=False, **kwargs)`
 

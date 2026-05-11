@@ -7,11 +7,12 @@ import asyncio
 import inspect
 from typing import TYPE_CHECKING, Any
 
-from ..utils.exceptions import CommandConflictError
+from ..loader.kernel_proxy import get_module_kernel, get_module_register
 from ..loader.module_base import ModuleBase
+from ..utils.exceptions import CommandConflictError
 
 if TYPE_CHECKING:
-    from kernel import Kernel
+    pass
 
 
 class ModuleDetectorMixin:
@@ -20,7 +21,9 @@ class ModuleDetectorMixin:
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
-    def _build_module(self, spec, file_path: str, module_name: str):
+    def _build_module(
+        self, spec, file_path: str, module_name: str, *, is_system: bool = False
+    ):
         """Create a module object preloaded with kernel context."""
         import builtins
         import importlib
@@ -34,7 +37,7 @@ class ModuleDetectorMixin:
         module.__name__ = module_name
         module.__builtins__ = builtins
         module.sys = sys
-        module.kernel = self.k
+        module.kernel = get_module_kernel(self.k, module_name, is_system)
         module.client = self.k.client
         module.custom_prefix = self.k.custom_prefix
         self.k.logger.debug(f"[Loader] _build_module done name={module_name}")
@@ -106,7 +109,9 @@ class ModuleDetectorMixin:
         self.k.logger.debug("[Loader] detect_module_type result=none")
         return "none"
 
-    async def register_module(self, module, module_type: str, module_name: str) -> bool:
+    async def register_module(
+        self, module, module_type: str, module_name: str, *, is_system: bool = True
+    ) -> bool:
         """Call the module's register function according to its type.
 
         Raises:
@@ -127,6 +132,11 @@ class ModuleDetectorMixin:
                     return False
 
                 module_class_name = getattr(cls, "name", module_name)
+                instance_key = (
+                    module_class_name
+                    if module_class_name and module_class_name != "Unnamed"
+                    else module_name
+                )
 
                 saved_loading_module = k.current_loading_module
                 k.current_loading_module = module_class_name
@@ -167,7 +177,9 @@ class ModuleDetectorMixin:
                     if old_module_file in k._class_module_instances:
                         del k._class_module_instances[old_module_file]
 
-                instance = cls(k, k.client, k.register)
+                module_kernel = get_module_kernel(k, module_class_name, is_system)
+                module_register = get_module_register(k, module_class_name, is_system)
+                instance = cls(module_kernel, k.client, module_register)
                 k.logger.debug(
                     "[loader.register_module] class instance created module=%r class=%r",
                     module_name,
@@ -175,7 +187,7 @@ class ModuleDetectorMixin:
                 )
                 if not hasattr(k, "_class_module_instances"):
                     k._class_module_instances = {}
-                k._class_module_instances[module_name] = instance
+                k._class_module_instances[instance_key] = instance
                 module._class_instance = instance
 
                 k.current_loading_module = saved_loading_module
@@ -186,13 +198,15 @@ class ModuleDetectorMixin:
                 methods = self._iter_register_methods(getattr(module, "register", None))
                 if not methods:
                     return False
+                module_kernel = get_module_kernel(k, module_name, is_system)
                 for attr in methods:
-                    await self._call_register(attr, k)
+                    await self._call_register(attr, module_kernel)
 
             elif module_type == "new":
                 if not (hasattr(module, "register") and callable(module.register)):
                     return False
-                await self._call_register(module.register, k)
+                module_kernel = get_module_kernel(k, module_name, is_system)
+                await self._call_register(module.register, module_kernel)
 
             elif module_type == "old":
                 if not (hasattr(module, "register") and callable(module.register)):
@@ -203,7 +217,8 @@ class ModuleDetectorMixin:
                 if not (hasattr(module, "register") and callable(module.register)):
                     return False
                 try:
-                    await self._call_register(module.register, k)
+                    module_kernel = get_module_kernel(k, module_name, is_system)
+                    await self._call_register(module.register, module_kernel)
                 except Exception:
                     try:
                         await self._call_register(module.register, k.client)
@@ -290,16 +305,22 @@ class ModuleDetectorMixin:
                     k.logger.error(f"on_reload error in {module_name}: {e}")
 
             if is_install:
-                try:
-                    if inspect.iscoroutinefunction(instance.on_install):
-                        await instance.on_install()
-                    else:
-                        result = instance.on_install()
-                        if asyncio.iscoroutine(result):
-                            await result
-                    k.logger.debug(f"on_install called for class module: {module_name}")
-                except Exception as e:
-                    k.logger.error(f"on_install error in {module_name}: {e}")
+                flag = f"__installed__{module_name}"
+                already = await k.db_get("mcub_module_flags", flag)
+                if not already:
+                    try:
+                        if inspect.iscoroutinefunction(instance.on_install):
+                            await instance.on_install()
+                        else:
+                            result = instance.on_install()
+                            if asyncio.iscoroutine(result):
+                                await result
+                        await k.db_set("mcub_module_flags", flag, "1")
+                        k.logger.debug(
+                            f"on_install called for class module: {module_name}"
+                        )
+                    except Exception as e:
+                        k.logger.error(f"on_install error in {module_name}: {e}")
 
             return
 

@@ -7,6 +7,7 @@ Tests for module loader
 
 import inspect
 import os
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -169,6 +170,38 @@ class TestUninstallCallback:
         await loader.unregister_module_commands("test_module")
 
     @pytest.mark.asyncio
+    async def test_uninstall_async_callback_is_awaited(self):
+        """Test that async uninstall callback is awaited before unload finishes."""
+        from core.lib.loader.loader import ModuleLoader
+
+        kernel = MagicMock()
+        kernel.loaded_modules = {"test_module": MagicMock()}
+        kernel.system_modules = {}
+        kernel.command_handlers = {}
+        kernel.command_owners = {}
+        kernel.aliases = {}
+        kernel.inline_handlers = {}
+        kernel.inline_handlers_owners = {}
+        kernel.unregister_module_inline_handlers = MagicMock()
+        kernel.logger = MagicMock()
+
+        state = {"done": False}
+
+        async def uninstall_cb(_k):
+            state["done"] = True
+
+        test_module = kernel.loaded_modules["test_module"]
+        test_module.register = MagicMock()
+        test_module.register.__loops__ = []
+        test_module.register.__watchers__ = []
+        test_module.register.__event_handlers__ = []
+        test_module.register.__uninstall__ = uninstall_cb
+
+        loader = ModuleLoader(kernel)
+        await loader.unregister_module_commands("test_module")
+        assert state["done"] is True
+
+    @pytest.mark.asyncio
     async def test_uninstall_removes_handlers_with_specific_event(self):
         """Test that unload removes only the tracked watcher/event bindings."""
         from core.lib.loader.loader import ModuleLoader
@@ -203,6 +236,182 @@ class TestUninstallCallback:
 
         client.remove_event_handler.assert_any_call(watcher, watcher_event)
         client.remove_event_handler.assert_any_call(event_handler, event_obj)
+
+    @pytest.mark.asyncio
+    async def test_uninstall_prunes_central_tracked_handlers_for_module(self):
+        """Unload must not leave central handlers that ensure() can resurrect."""
+        from core.lib.loader.loader import ModuleLoader
+
+        kernel = MagicMock()
+        kernel.loaded_modules = {"test_module": MagicMock()}
+        kernel.system_modules = {}
+        kernel.command_handlers = {}
+        kernel.command_owners = {}
+        kernel.aliases = {}
+        kernel.inline_handlers = {}
+        kernel.inline_handlers_owners = {}
+        kernel.command_metadata = {}
+        kernel.unregister_module_inline_handlers = MagicMock()
+        kernel.logger = MagicMock()
+
+        client = MagicMock()
+        kernel.client = client
+        stale_watcher = MagicMock()
+        stale_watcher_event = MagicMock()
+        other_watcher = MagicMock()
+        other_watcher_event = MagicMock()
+
+        def stale_event_handler(_event):
+            pass
+
+        stale_event_handler.__module__ = "test_module"
+
+        def other_event_handler(_event):
+            pass
+
+        other_event_handler.__module__ = "other_module"
+
+        stale_event_obj = MagicMock()
+        other_event_obj = MagicMock()
+        kernel.register = SimpleNamespace(
+            _all_watchers=[
+                (
+                    stale_watcher,
+                    stale_watcher_event,
+                    client,
+                    {"module": "test_module", "method": "watch"},
+                ),
+                (
+                    other_watcher,
+                    other_watcher_event,
+                    client,
+                    {"module": "other_module", "method": "watch"},
+                ),
+            ],
+            _all_event_handlers=[
+                (stale_event_handler, stale_event_obj, client),
+                (other_event_handler, other_event_obj, client),
+            ],
+        )
+
+        test_module = kernel.loaded_modules["test_module"]
+        test_module.register = MagicMock()
+        test_module.register.__loops__ = []
+        test_module.register.__watchers__ = [
+            (stale_watcher, stale_watcher_event, client)
+        ]
+        test_module.register.__event_handlers__ = [
+            (stale_event_handler, stale_event_obj, client)
+        ]
+
+        loader = ModuleLoader(kernel)
+        await loader.unregister_module_commands("test_module")
+
+        assert kernel.register._all_watchers == [
+            (
+                other_watcher,
+                other_watcher_event,
+                client,
+                {"module": "other_module", "method": "watch"},
+            )
+        ]
+        assert kernel.register._all_event_handlers == [
+            (other_event_handler, other_event_obj, client)
+        ]
+
+    def test_duplicate_watcher_is_not_bound_before_skip(self):
+        """Duplicate watcher detection must not leak an untracked client binding."""
+        from core.lib.loader.register import Register
+
+        kernel = MagicMock()
+        kernel.client = MagicMock()
+        kernel.bot_client = None
+        kernel.current_loading_module = "test_module"
+        kernel.loaded_modules = {}
+        kernel.system_modules = {}
+        kernel.logger = MagicMock()
+        register = Register(kernel)
+
+        existing_wrapper = MagicMock()
+        existing_event = MagicMock()
+        register._all_watchers.append(
+            (
+                existing_wrapper,
+                existing_event,
+                kernel.client,
+                {"module": "test_module", "method": "watch"},
+            )
+        )
+        module = SimpleNamespace(__name__="test_module")
+
+        async def watch(_event):
+            pass
+
+        register.watcher(module=module)(watch)
+
+        kernel.client.add_event_handler.assert_not_called()
+        assert register._all_watchers == [
+            (
+                existing_wrapper,
+                existing_event,
+                kernel.client,
+                {"module": "test_module", "method": "watch"},
+            )
+        ]
+        assert not hasattr(module, "register")
+
+    def test_duplicate_event_is_not_bound_before_skip(self):
+        """Duplicate event detection must not leak an untracked client binding."""
+        from core.lib.loader.register import Register
+
+        kernel = MagicMock()
+        kernel.client = MagicMock()
+        kernel.bot_client = None
+        kernel.current_loading_module = "test_module"
+        kernel.loaded_modules = {}
+        kernel.system_modules = {}
+        kernel.logger = MagicMock()
+        register = Register(kernel)
+
+        def existing_handler(_event):
+            pass
+
+        from telethon import events
+
+        existing_event = events.NewMessage()
+        register._all_event_handlers.append(
+            (
+                existing_handler,
+                existing_event,
+                kernel.client,
+                {
+                    "module": "test_module",
+                    "handler": "watch_updates",
+                    "event_type": "NewMessage",
+                },
+            )
+        )
+        module = SimpleNamespace(__name__="test_module")
+
+        async def watch_updates(_event):
+            pass
+
+        register.event("message", module=module)(watch_updates)
+
+        kernel.client.add_event_handler.assert_not_called()
+        assert register._all_event_handlers == [
+            (
+                existing_handler,
+                existing_event,
+                kernel.client,
+                {
+                    "module": "test_module",
+                    "handler": "watch_updates",
+                    "event_type": "NewMessage",
+                },
+            )
+        ]
+        assert not hasattr(module, "register")
 
     @pytest.mark.asyncio
     async def test_uninstall_removes_aliases_for_module_commands(self):
@@ -514,6 +723,30 @@ class TestHikkaModuleUnload:
 class TestHikkaModuleConfigSchema:
     """Test Hikka module config schema storage"""
 
+    def test_herokutl_events_import_is_available(self):
+        """Test Heroku modules can import Telethon events via herokutl."""
+        from core.lib.loader.hikka_compat.fake_package import _ensure_fake_package
+
+        _ensure_fake_package()
+
+        from herokutl import events
+        from telethon import events as telethon_events
+
+        assert events is telethon_events
+        assert events.NewMessage is telethon_events.NewMessage
+
+    def test_herokutl_top_level_functions_import_is_available(self):
+        """Test Heroku modules can import TL functions from herokutl."""
+        from core.lib.loader.hikka_compat.fake_package import _ensure_fake_package
+
+        _ensure_fake_package()
+
+        from herokutl import functions
+        from herokutl.tl import functions as tl_functions
+
+        assert functions is tl_functions
+        assert functions.account.UpdateNotifySettingsRequest is not None
+
     @pytest.mark.asyncio
     async def test_hikka_module_config_stores_schema(self):
         """Test that Hikka module config schema is stored for UI"""
@@ -629,7 +862,8 @@ class TestClassStyleModule:
         result = await loader.register_module(module, "class", "test_class_mod")
 
         assert result is True
-        assert "test_class_mod" in kernel._class_module_instances
+        assert "MyCustomName" in kernel._class_module_instances
+        assert "test_class_mod" not in kernel._class_module_instances
 
     @pytest.mark.asyncio
     async def test_find_module_base_class(self):
@@ -973,6 +1207,22 @@ def register(kernel):
         assert metadata["author"] == "@TypeFrag"
 
     @pytest.mark.asyncio
+    async def test_get_module_metadata_meta_developer_header(self):
+        from core.lib.loader.loader import ModuleLoader
+
+        kernel = MagicMock()
+        loader = ModuleLoader(kernel)
+
+        code = """
+# meta developer: @H_SunMods
+# meta banner: https://example.com/banner.webp
+"""
+
+        metadata = await loader.get_module_metadata(code)
+        assert metadata["author"] == "@H_SunMods"
+        assert metadata["banner_url"] == "https://example.com/banner.webp"
+
+    @pytest.mark.asyncio
     async def test_get_module_metadata_header_description_i18n_inline(self):
         from core.lib.loader.loader import ModuleLoader
 
@@ -990,6 +1240,85 @@ def register(kernel):
             "ru": "Описание модуля",
             "en": "Module description",
         }
+
+    @pytest.mark.asyncio
+    async def test_get_module_metadata_command_doc_dict(self):
+        from core.lib.loader.loader import ModuleLoader
+
+        kernel = MagicMock()
+        loader = ModuleLoader(kernel)
+
+        code = """
+def register(kernel):
+    @kernel.register.command("term", doc={"en": "run shell", "ru": "запустить shell"})
+    async def term_handler(event):
+        pass
+"""
+
+        metadata = await loader.get_module_metadata(code)
+        assert metadata["commands"]["term"] == "запустить shell"
+
+    @pytest.mark.asyncio
+    async def test_get_module_metadata_hikka_style_class_docstring(self):
+        from core.lib.loader.loader import ModuleLoader
+
+        kernel = MagicMock()
+        loader = ModuleLoader(kernel)
+
+        code = '''
+from hikkatl import loader
+
+class HkMod(loader.Module):
+    """Hikka module docstring description"""
+    strings = {"name": "HkMod"}
+'''
+
+        metadata = await loader.get_module_metadata(code)
+        assert metadata["is_class_style"] is True
+        assert metadata["description"] == "Hikka module docstring description"
+
+
+class TestClassStyleOnInstall:
+    @pytest.mark.asyncio
+    async def test_class_on_install_runs_only_once(self):
+        from core.lib.loader.loader import ModuleLoader
+
+        kernel = MagicMock()
+        kernel.logger = MagicMock()
+        kernel.db_get = AsyncMock(side_effect=[None, "1"])
+        kernel.db_set = AsyncMock()
+
+        loader = ModuleLoader(kernel)
+        module = MagicMock()
+        module.register = MagicMock()
+        module.register.__loops__ = []
+        module.register.__watchers__ = []
+        module.register.__event_handlers__ = []
+
+        class Instance:
+            _loaded = False
+            _loops = []
+
+            def __init__(self):
+                self.on_install_calls = 0
+
+            async def on_load(self):
+                return None
+
+            async def on_reload(self):
+                return None
+
+            async def on_install(self):
+                self.on_install_calls += 1
+
+        inst = Instance()
+        module._class_instance = inst
+
+        await loader.run_post_load(module, "TestMod", is_install=True, is_reload=False)
+        await loader.run_post_load(module, "TestMod", is_install=True, is_reload=False)
+
+        assert inst.on_install_calls == 1
+        kernel.db_set.assert_awaited_once()
 
 
 class TestClassStylePreInstallRequirements:

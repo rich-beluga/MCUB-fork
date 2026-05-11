@@ -2,7 +2,9 @@
 
 ← [Index](../../API_DOC.md)
 
-MCUB uses SQLite for module data storage. Access via `self.db` (class-style) or `kernel.db_manager` (function-style).
+MCUB uses SQLite for module data storage. Database methods are async. Access them via
+`self.db` in class-style modules, or via `kernel.db_manager` / kernel helper methods in
+function-style modules.
 
 > [!TIP]
 > For class-style modules, see [Class-Style Modules](../registration/class-style.md) for complete examples.
@@ -11,7 +13,7 @@ MCUB uses SQLite for module data storage. Access via `self.db` (class-style) or 
 
 Simple `(module, key)` storage — module manages its own data.
 
-### `db.db_set(module, key, value)`
+### `await db.db_set(module: str, key: str, value: Any)`
 
 Store a value.
 
@@ -23,9 +25,13 @@ await self.db.db_set("mymodule", "data", {"key": "value"})
 **Parameters:**
 - `module` (str): Namespace (usually `self.name`)
 - `key` (str): Key
-- `value` (Any): Any value (converted to string)
+- `value` (Any): Stored as `str(value)` in SQLite
 
-### `db.db_get(module, key)`
+**Raises:**
+- `RuntimeError` if the database was not initialized.
+- `ValueError` if `module` or `key` is empty, longer than 64 chars, or contains characters outside `a-zA-Z0-9_.-`.
+
+### `await db.db_get(module: str, key: str) -> str | None`
 
 Retrieve a value.
 
@@ -36,7 +42,9 @@ value = await self.db.db_get("mymodule", "counter")
 
 **Returns:** `str | None`
 
-### `db.db_delete(module, key)`
+**Raises:** `RuntimeError`, `ValueError` under the same conditions as `db_set`.
+
+### `await db.db_delete(module: str, key: str)`
 
 Delete a value.
 
@@ -44,11 +52,28 @@ Delete a value.
 await self.db.db_delete("mymodule", "counter")
 ```
 
+**Raises:** `RuntimeError`, `ValueError` under the same conditions as `db_set`.
+
+### `await db.db_get_module_keys(module: str) -> list[str]`
+
+Return all keys stored for a module namespace.
+
+```python
+keys = await self.db.db_get_module_keys(self.name)
+```
+
+**Raises:** `RuntimeError` if uninitialized, `ValueError` if `module` is invalid.
+
+### `await db.db_get_config_modules() -> list[str]`
+
+Return module names with non-empty values stored under the internal `module_configs` namespace.
+This is mainly used by MCUB internals and config tooling.
+
 ## Raw SQL (read-only)
 
-### `db.db_query(query, parameters)`
+### `await db.db_query(query: str, parameters: tuple = ()) -> list[tuple]`
 
-Execute SQL query (SELECT/PRAGMA/EXPLAIN only).
+Execute a custom SQL query. Only `SELECT`, safe `PRAGMA`, and `EXPLAIN` queries are allowed.
 
 ```python
 rows = await self.db.db_query(
@@ -58,11 +83,17 @@ rows = await self.db.db_query(
 ```
 
 > [!CAUTION]
-> Write operations `INSERT`, `UPDATE`, `DELETE`, `DROP` are blocked for security.
+> Write operations (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, etc.), multiple
+> statements, `sqlite_master` access, and dangerous pragmas such as `writable_schema` are blocked.
+
+**Raises:**
+- `RuntimeError` if the database was not initialized.
+- `PermissionError` if the query is blocked by the security policy.
 
 ## Module-Level Access
 
-For function-style modules use `kernel.db_manager`:
+For function-style modules use `kernel.db_manager` directly, or the kernel helpers
+`kernel.db_set(module, key, value)` and `kernel.db_get(module, key)` when available:
 
 ```python
 from typing import Any
@@ -71,11 +102,11 @@ from telethon import events
 def register(kernel: Any) -> None:
     @kernel.register.command("save")
     async def save_cmd(event: events.NewMessage.Event) -> None:
-        await kernel.db_manager.db_set("mymodule", "key", "value")
+        await kernel.db_set("mymodule", "key", "value")
 
     @kernel.register.command("load")
     async def load_cmd(event: events.NewMessage.Event) -> None:
-        value: str | None = await kernel.db_manager.db_get("mymodule", "key")
+        value: str | None = await kernel.db_get("mymodule", "key")
         await event.edit(f"Value: {value}")
 ```
 
@@ -124,5 +155,4 @@ class RememberModule(ModuleBase):
         memory.append(args[1])
         await self.db.db_set(self.name, "memory", json.dumps(memory))
         await event.edit(f"Saved! Total: {len(memory)}")
-```
 ```
