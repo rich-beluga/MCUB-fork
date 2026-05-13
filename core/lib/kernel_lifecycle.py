@@ -20,7 +20,9 @@ except ImportError:
     HTML_PARSER_AVAILABLE = False
 from telethon import events, install_uvloop
 
+from core.lib.utils.colors import Colors
 from core.lib.utils.logger import KernelLogger, setup_telegram_logging
+from utils.restart import read_restart_context
 
 
 class KernelLifecycleMixin:
@@ -201,27 +203,22 @@ class KernelLifecycleMixin:
         restart_time = None
         if os.path.exists(self.RESTART_FILE):
             try:
-                with open(self.RESTART_FILE) as f:
-                    data = f.read().split(",")
-                if len(data) >= 2:
-                    restart_chat_id = int(data[0])
-                    restart_msg_id = int(data[1])
-                    if len(data) >= 3:
-                        restart_time = float(data[2])
+                restart_ctx = read_restart_context(self.RESTART_FILE)
+                restart_chat_id = restart_ctx.chat_id
+                restart_msg_id = restart_ctx.message_id
+                restart_time = restart_ctx.timestamp
 
-                    em_alembic = '<tg-emoji emoji-id="5332654441508119011">⚗️</tg-emoji>'
-                    emoji = "(*.*)"
-                    total_ms = (
-                        round(time.time() - restart_time, 2) if restart_time else 0
-                    )
+                em_alembic = '<tg-emoji emoji-id="5332654441508119011">⚗️</tg-emoji>'
+                emoji = "(*.*)"
+                total_ms = round(time.time() - restart_time, 2) if restart_time else 0
 
-                    await self.client.edit_message(
-                        restart_chat_id,
-                        restart_msg_id,
-                        f"{em_alembic} {strings('success')} {emoji}\n"
-                        f"<i>{strings('loading')}</i> <b>Kernel boot:</b><code> {total_ms} </code>s",
-                        parse_mode="html",
-                    )
+                await self.client.edit_message(
+                    restart_chat_id,
+                    restart_msg_id,
+                    f"{em_alembic} {strings('success')} {emoji}\n"
+                    f"<i>{strings('loading')}</i> <b>Kernel boot:</b><code> {total_ms} </code>s",
+                    parse_mode="html",
+                )
             except Exception:
                 pass
         self.client.set_protection_mode("safe")
@@ -396,17 +393,11 @@ class KernelLifecycleMixin:
     ) -> None:
         """Read restart.tmp and send a post-restart status message."""
         try:
-            with open(self.RESTART_FILE) as f:
-                data = f.read().split(",")
-
-            if len(data) < 3:
-                os.remove(self.RESTART_FILE)
-                return
-
-            chat_id = int(data[0])
-            msg_id = int(data[1])
-            restart_time = float(data[2])
-            thread_id = int(data[3]) if len(data) >= 4 else None
+            restart_ctx = read_restart_context(self.RESTART_FILE)
+            chat_id = restart_ctx.chat_id
+            msg_id = restart_ctx.message_id
+            restart_time = restart_ctx.timestamp
+            thread_id = restart_ctx.thread_id
 
             os.remove(self.RESTART_FILE)
 
