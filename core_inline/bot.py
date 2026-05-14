@@ -616,14 +616,18 @@ class InlineBot:
             )
 
     async def _configure_bot(self, botfather_client: Any | None = None) -> None:
-        """Configure bot profile and commands.
+        """Configure bot profile, commands, inline mode and inline feedback.
 
-        Uses aiogram/Bot API first, then optional BotFather fallback.
+        Uses aiogram/Bot API for description and commands, then always
+        runs BotFather config for /setinline and /setinlinefeedback —
+        the Bot API cannot set those, only BotFather can.
         """
 
         api_ok = await self._configure_bot_via_api()
-        if api_ok:
-            return
+        if not api_ok:
+            self.logger.warning(
+                "[InlineBot] API configure failed, inline setup via BotFather only"
+            )
 
         if botfather_client is not None:
             await self._configure_bot_via_botfather(botfather_client)
