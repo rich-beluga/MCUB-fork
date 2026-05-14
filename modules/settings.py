@@ -344,7 +344,7 @@ class SettingsModule(ModuleBase):
                 buttons=button_rows,
             )
             if success:
-                await self.client.delete_messages(event.chat_id, [event.message_id])
+                await event.delete()
             return
 
         new_lang = args[0].lower()
