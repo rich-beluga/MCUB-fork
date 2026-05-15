@@ -19,6 +19,7 @@ try:
 except ImportError:
     HTML_PARSER_AVAILABLE = False
 from telethon import events, install_uvloop
+from core.lib.loader.kernel_proxy import wrap_event_for_module
 
 from core.lib.utils.colors import Colors
 from core.lib.utils.logger import KernelLogger, setup_telegram_logging
@@ -615,7 +616,10 @@ class KernelLifecycleMixin:
                     f"executing '{cmd}' directly"
                 )
                 if cmd in self.command_handlers:
-                    await self.command_handlers[cmd](event)
+                    _cmd_mod = self.command_owners.get(cmd, "unknown")
+                    await self.command_handlers[cmd](
+                        wrap_event_for_module(event, _cmd_mod, self)
+                    )
                     return True
                 return False
             args = text[len(active_prefix) + len(cmd) :]
@@ -636,7 +640,8 @@ class KernelLifecycleMixin:
                     f"Command handler for '{cmd}' is not callable, skipping"
                 )
                 return False
-            await handler(event)
+            _cmd_mod = self.command_owners.get(cmd, "unknown")
+            await handler(wrap_event_for_module(event, _cmd_mod, self))
             return True
 
         self.logger.debug(
@@ -658,7 +663,7 @@ class KernelLifecycleMixin:
 
         if cmd in self.bot_command_handlers:
             _, handler = self.bot_command_handlers[cmd]
-            await handler(event)
+            await handler(wrap_event_for_module(event, "bot_command", self))
             return True
 
         return False

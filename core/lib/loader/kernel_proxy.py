@@ -748,6 +748,105 @@ def get_module_kernel(kernel: Any, module_name: str, is_system: bool) -> Any:
     return ModuleKernelProxy(kernel, module_name)
 
 
+class EventProxy:
+    """Safe Event wrapper for user modules.
+
+    Transparently passes through all attribute reads, writes, deletes, and
+    calls to the underlying Telethon event, **except** for .client and
+    ._client which are replaced with a  so that the real
+    TelegramClient is never exposed to module code.
+
+    This prevents modules from calling destructive client operations
+    (disconnect, logout, session access, add_event_handler,
+    etc.) through the event object.
+    """
+
+    __slots__ = (
+        "_proxied_event",
+        "_proxy_module_name",
+        "_proxy_kernel",
+        "_proxy_client_cache",
+    )
+
+    def __init__(self, event: Any, module_name: str, kernel: Any) -> None:
+        object.__setattr__(self, "_proxied_event", event)
+        object.__setattr__(self, "_proxy_module_name", module_name)
+        object.__setattr__(self, "_proxy_kernel", kernel)
+        object.__setattr__(self, "_proxy_client_cache", None)
+
+    # -- internal helpers ---------------------------------------------------
+
+    def _get_proxy_client(self) -> ClientProxy:
+        cache = object.__getattribute__(self, "_proxy_client_cache")
+        if cache is None:
+            kernel = object.__getattribute__(self, "_proxy_kernel")
+            module_name = object.__getattribute__(self, "_proxy_module_name")
+            cache = ClientProxy(kernel.client, module_name)
+            object.__setattr__(self, "_proxy_client_cache", cache)
+        return cache
+
+    # -- attribute access ---------------------------------------------------
+
+    def __getattribute__(self, name: str) -> Any:
+        # Intercept .client and ._client – return a proxied version
+        if name in ("client", "_client"):
+            return object.__getattribute__(self, "_get_proxy_client")()
+
+        # Internal proxy attributes (stored via __slots__)
+        if name in EventProxy.__slots__:
+            return object.__getattribute__(self, name)
+
+        # Block __dict__ – prevents event.__dict__["_client"] bypass
+        if name == "__dict__":
+            _raise_insecure(
+                name,
+                object.__getattribute__(self, "_proxy_module_name"),
+            )
+
+        # Everything else → original event
+        return getattr(
+            object.__getattribute__(self, "_proxied_event"),
+            name,
+        )
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in EventProxy.__slots__:
+            object.__setattr__(self, name, value)
+            return
+        setattr(object.__getattribute__(self, "_proxied_event"), name, value)
+
+    def __delattr__(self, name: str) -> None:
+        if name in EventProxy.__slots__:
+            raise AttributeError(f"Cannot delete proxy internal attribute: {name}")
+        delattr(object.__getattribute__(self, "_proxied_event"), name)
+
+    # -- forwarding dunder methods -----------------------------------------
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        """Forward event(...) – Telethon raw API calls."""
+        return object.__getattribute__(self, "_proxied_event")(*args, **kwargs)
+
+    def __repr__(self) -> str:
+        return repr(object.__getattribute__(self, "_proxied_event"))
+
+    def __dir__(self) -> list[str]:
+        return dir(object.__getattribute__(self, "_proxied_event"))
+
+
+def wrap_event_for_module(event: Any, module_name: str, kernel: Any) -> Any:
+    """Wrap a Telethon event in an EventProxy if it looks like an event.
+
+    Returns an EventProxy when the object has a client attribute
+    (i.e. it is a Telethon event), otherwise returns the object unchanged.
+    This keeps calls that pass non-event objects (pipeline contexts, mock
+    events in tests) working without changes.
+    """
+    # Quick heuristic – Telethon events always have _client / client
+    if hasattr(event, "_client") or hasattr(event, "client"):
+        return EventProxy(event, module_name, kernel)
+    return event
+
+
 def get_module_register(kernel: Any, module_name: str, is_system: bool) -> Any:
     """Return a proxied register for user modules, raw for system."""
     if is_system:

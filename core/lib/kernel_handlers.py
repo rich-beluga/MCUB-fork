@@ -13,6 +13,10 @@ try:
     from telethon import events
 except ImportError:
     events = None
+try:
+    from core.lib.loader.kernel_proxy import wrap_event_for_module
+except ImportError:
+    wrap_event_for_module = lambda e, *a, **kw: e
 
 try:
     from ..lib.loader.inline import InlineMessage as _InlineMessage
@@ -455,7 +459,8 @@ class KernelHandlersMixin:
         for mw in self.middleware_chain:
             if await mw(event, handler) is False:
                 return False
-        return await handler(event)
+        _pe_mw = wrap_event_for_module(event, "middleware", self)
+        return await handler(_pe_mw)
 
     async def init_client(self) -> bool:
         """Initialize and authorize the main Telegram client."""

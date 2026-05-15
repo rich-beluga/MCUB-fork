@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import Any
 
 from utils.strings import Strings
+from core.lib.loader.kernel_proxy import wrap_event_for_module
 
 
 class _ModuleLoggerAdapter(logging.LoggerAdapter):
@@ -167,7 +168,8 @@ class ModuleBase(ABC):
                 event, permission_tags
             ):
                 return
-            return await func(self, event)
+            _pe = wrap_event_for_module(event, self.name, self.kernel)
+            return await func(self, _pe)
 
         bound_wrapper.__original__ = func
         bound_wrapper.__bound_instance__ = self
@@ -212,7 +214,8 @@ class ModuleBase(ABC):
             user_module.register = type("RegisterObject", (), {})()
 
         async def bound_wrapper(event: Any, args: str, data: Any = None) -> None:
-            return await func(self, event, args, data)
+            _pe = wrap_event_for_module(event, self.name, self.kernel)
+            return await func(self, _pe, args, data)
 
         bound_wrapper.__original__ = func
         bound_wrapper.__bound_instance__ = self

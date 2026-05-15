@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from telethon.types import Message
 
 from core_inline.handlers import InlineHandlers
+from core.lib.loader.kernel_proxy import wrap_event_for_module
 from utils import Strings
 
 
@@ -404,7 +405,10 @@ class InlineManager:
                 @k.client.on(events.CallbackQuery(pattern=pattern_bytes))
                 async def _wrapper(event):
                     try:
-                        await handler(event)
+                        _pe = wrap_event_for_module(
+                            event, getattr(handler, "__module__", "callback"), k
+                        )
+                        await handler(_pe)
                     except Exception as e:
                         await k.handle_error(e, source="callback_handler", event=event)
 

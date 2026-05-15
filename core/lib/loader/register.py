@@ -16,6 +16,7 @@ from typing import Any
 from telethon import events
 
 from core.lib.utils.exceptions import CommandConflictError
+from core.lib.loader.kernel_proxy import wrap_event_for_module
 
 
 class InfiniteLoop:
@@ -721,10 +722,13 @@ class Register:
                         module_name,
                         watcher_name,
                     )
+                    _proxy_event = wrap_event_for_module(
+                        event, module_name, self.kernel
+                    )
                     if bound_instance is not None:
-                        await raw_func(bound_instance, event)
+                        await raw_func(bound_instance, _proxy_event)
                     else:
-                        await f(event)
+                        await f(_proxy_event)
                     self.kernel.logger.debug(
                         "[watcher] done module=%r watcher=%r",
                         module_name,
@@ -1315,7 +1319,8 @@ class Register:
                     if not is_admin:
                         return
 
-                await f(event)
+                _pe_owner = wrap_event_for_module(event, "owner", self.kernel)
+                await f(_pe_owner)
 
             wrapper.__name__ = f"owner:{f.__name__}"
             return wrapper
