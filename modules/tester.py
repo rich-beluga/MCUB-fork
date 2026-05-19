@@ -196,7 +196,11 @@ class TesterMod(ModuleBase):
 
     async def _resolve_version_info(self):
         version_info = self.cache.get("tester:version_info")
-        if version_info is None:
+        if (
+            version_info is None
+            or not isinstance(version_info, tuple)
+            or len(version_info) != 3
+        ):
             branch = await self.kernel.version_manager.detect_branch()
             commit_sha = await self.kernel.version_manager.get_commit_sha()
             commit_url = await self.kernel.version_manager.get_github_commit_url()
