@@ -550,6 +550,16 @@ def register(kernel):
     async def startup():
         nonlocal protection_enabled
         config_dict = await kernel.get_module_config(__name__, DEFAULT_CONFIG.copy())
+
+        # Normalize raw dict BEFORE from_dict() so List validator doesn't
+        # choke on legacy / malformed stored values (e.g. null, bare string).
+        if isinstance(config_dict, dict):
+            for key in LIST_CONFIG_KEYS:
+                if key in config_dict and not isinstance(config_dict[key], list):
+                    config_dict[key] = _coerce_method_list(
+                        config_dict[key], DEFAULT_CONFIG.get(key, [])
+                    )
+
         config.from_dict(config_dict)
         _normalize_list_config_values(config)
         protection_enabled = bool(config.get("enable_protection", True))
