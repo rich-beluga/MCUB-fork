@@ -114,6 +114,10 @@ class CallbackPermissionManager:
             if expiry_time <= current_time:
                 continue
 
+            # Skip empty patterns
+            if not allowed_pattern:
+                continue
+
             # Prefix matching: if requested pattern starts with allowed pattern
             if pattern_str.startswith(allowed_pattern):
                 return True

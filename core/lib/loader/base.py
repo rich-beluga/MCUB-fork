@@ -550,10 +550,6 @@ class ModuleBase(ABC):
         self.client = client
         self._register = register
 
-        self.log = kernel.logger
-        self.db = kernel.db_manager
-        self.cache = kernel.cache
-
         self._loaded = False
         self._loops = []
         self._watchers = []
@@ -564,6 +560,19 @@ class ModuleBase(ABC):
         self._config = None
         self.name = type(self).name
         self.log = _ModuleLoggerAdapter(kernel.logger, {"module_name": self.name})
+
+        # Wrap client and db in security proxies
+        try:
+            from .kernel_proxy import get_module_client, get_module_db
+
+            is_system = getattr(kernel, "_is_system", False)
+            self.client = get_module_client(kernel, self.name, is_system)
+            self.db = get_module_db(kernel, self.name, is_system)
+        except Exception:
+            self.client = client
+            self.db = getattr(kernel, "db_manager", None)
+
+        self.cache = getattr(kernel, "cache", None)
 
         module_class = type(self)
         for klass in module_class.__mro__:

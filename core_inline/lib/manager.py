@@ -11,9 +11,13 @@ class InlineManager:
         self.kernel = kernel
 
     async def is_admin(self, user_id: int) -> bool:
-        return hasattr(self.kernel, "ADMIN_ID") and int(user_id) == int(
-            self.kernel.ADMIN_ID
-        )
+        admin_id = getattr(self.kernel, "ADMIN_ID", None)
+        if admin_id is None:
+            return False
+        try:
+            return int(admin_id) > 0 and int(user_id) == int(admin_id)
+        except (ValueError, TypeError):
+            return False
 
     async def is_allowed(self, user_id: int, command: str | None = None) -> bool:
         if await self.is_admin(user_id):

@@ -141,6 +141,21 @@ class ArchiveManager:
             self.k.logger.error(f"[ArchiveManager] Validation error: {e}")
             return False
 
+    @staticmethod
+    def _safe_extract_path(target_dir: str, member_name: str) -> str | None:
+        member_path = os.path.join(target_dir, member_name)
+        try:
+            real_target = os.path.realpath(target_dir)
+            real_member = os.path.realpath(member_path)
+            if (
+                not real_member.startswith(real_target + os.sep)
+                and real_member != real_target
+            ):
+                return None
+            return member_path
+        except (OSError, ValueError):
+            return None
+
     async def extract(self, archive_bytes: bytes, target_dir: str) -> ExtractionResult:
         """Extract archive to target directory."""
         self.k.logger.debug(f"[ArchiveManager] extract target={target_dir}")
@@ -150,19 +165,30 @@ class ArchiveManager:
         try:
             with zipfile.ZipFile(io.BytesIO(archive_bytes)) as zf:
                 for member in zf.namelist():
-                    member_path = os.path.join(target_dir, member)
-                    if ".." in member:
+                    if (
+                        ".." in member
+                        or member.startswith("/")
+                        or member.startswith("\\")
+                    ):
                         self.k.logger.error(
                             f"[ArchiveManager] Path traversal detected: {member}"
                         )
                         return ExtractionResult(
-                            success=False, error="Path traversal detected"
+                            success=False, error=f"Path traversal detected: {member}"
+                        )
+                    safe_path = self._safe_extract_path(target_dir, member)
+                    if safe_path is None:
+                        self.k.logger.error(
+                            f"[ArchiveManager] Path traversal detected (resolved): {member}"
+                        )
+                        return ExtractionResult(
+                            success=False, error=f"Path traversal detected: {member}"
                         )
                     if member.endswith("/"):
-                        os.makedirs(member_path, exist_ok=True)
+                        os.makedirs(safe_path, exist_ok=True)
                     else:
-                        os.makedirs(os.path.dirname(member_path), exist_ok=True)
-                        with zf.open(member) as src, open(member_path, "wb") as dst:
+                        os.makedirs(os.path.dirname(safe_path), exist_ok=True)
+                        with zf.open(member) as src, open(safe_path, "wb") as dst:
                             dst.write(src.read())
 
             return await self._process_extracted(target_dir)
@@ -171,14 +197,44 @@ class ArchiveManager:
             try:
                 with tarfile.open(fileobj=io.BytesIO(archive_bytes)) as tf:
                     for member in tf.getmembers():
-                        if ".." in member.name:
+                        if (
+                            ".." in member.name
+                            or member.name.startswith("/")
+                            or member.name.startswith("\\")
+                        ):
                             self.k.logger.error(
                                 f"[ArchiveManager] Path traversal: {member.name}"
                             )
                             return ExtractionResult(
-                                success=False, error="Path traversal detected"
+                                success=False,
+                                error=f"Path traversal detected: {member.name}",
                             )
-                        tf.extract(member, target_dir)
+                        if not member.isfile() and not member.isdir():
+                            self.k.logger.error(
+                                f"[ArchiveManager] Unsupported file type in archive: {member.name} ({member.type})"
+                            )
+                            return ExtractionResult(
+                                success=False,
+                                error=f"Unsupported file type: {member.name}",
+                            )
+                        safe_path = self._safe_extract_path(target_dir, member.name)
+                        if safe_path is None:
+                            self.k.logger.error(
+                                f"[ArchiveManager] Path traversal detected (resolved): {member.name}"
+                            )
+                            return ExtractionResult(
+                                success=False,
+                                error=f"Path traversal detected: {member.name}",
+                            )
+                        if member.isdir():
+                            os.makedirs(safe_path, exist_ok=True)
+                        else:
+                            os.makedirs(os.path.dirname(safe_path), exist_ok=True)
+                            with (
+                                tf.extractfile(member) as src,
+                                open(safe_path, "wb") as dst,
+                            ):
+                                dst.write(src.read())
 
                 return await self._process_extracted(target_dir)
             except Exception as e:

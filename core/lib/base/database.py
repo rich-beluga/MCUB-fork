@@ -19,7 +19,7 @@ class DatabaseManager:
     """SQLite database manager for the userbot."""
 
     DEFAULT_DB_FILE = "userbot.db"
-    ALLOWED_OPERATIONS = {"SELECT", "PRAGMA", "EXPLAIN"}
+    ALLOWED_OPERATIONS = {"SELECT", "EXPLAIN"}
     FORBIDDEN_PATTERNS = [
         r"\bDROP\b",
         r"\bDELETE\b",
@@ -89,48 +89,46 @@ class DatabaseManager:
     def _validate_query(self, query: str) -> bool:
         """Validate SQL query against security policy."""
         cleaned = self._strip_comments(query).strip()
+        # Remove string contents to check structure
         no_strings = re.sub(r"'[^']*'", "''", cleaned)
         no_strings = re.sub(r'"[^"]*"', '""', no_strings)
-        if ";" in no_strings.rstrip(";"):
+
+        # Multi-statement detection: allow only trailing semicolons
+        stripped = no_strings.rstrip(";").strip()
+        if ";" in stripped:
             self.logger.warning(
-                f"db_query: multiple statements blocked: {query[:50]}..."
+                f"db_query: multiple statements blocked: {query[:80]}..."
             )
             return False
 
-        query_upper = no_strings.upper()
+        query_upper = stripped.upper()
 
-        if re.search(r"\bSQLITE_MASTER\b", query_upper):
+        # Block access to sqlite schema tables
+        if re.search(r"\bSQLITE_(MASTER|TEMP_MASTER)\b", query_upper):
             self.logger.warning(
-                f"db_query: sqlite_master access blocked: {query[:50]}..."
+                f"db_query: sqlite_master access blocked: {query[:80]}..."
             )
             return False
 
-        if re.search(r"\bSQLITE_TEMP_MASTER\b", query_upper):
-            self.logger.warning(
-                f"db_query: sqlite_temp_master access blocked: {query[:50]}..."
-            )
-            return False
-
-        if query_upper.startswith("PRAGMA"):
-            pragma_match = re.search(r"PRAGMA\s*([\"']?)([\w]+)(\1)", cleaned.upper())
-            if pragma_match and pragma_match.group(2).lower() in self.DANGEROUS_PRAGMAS:
-                self.logger.warning(
-                    f"db_query: dangerous pragma blocked: {query[:50]}..."
-                )
-                return False
-
+        # Block dangerous operations
         for pattern in self.FORBIDDEN_PATTERNS:
             if re.search(pattern, query_upper):
                 self.logger.warning(
-                    f"db_query: forbidden operation blocked: {query[:50]}..."
+                    f"db_query: forbidden operation blocked: {query[:80]}..."
                 )
                 return False
 
-        for op in self.ALLOWED_OPERATIONS:
-            if query_upper.startswith(op):
-                return True
+        # Block PRAGMA entirely — it is too risky for arbitrary module queries
+        if re.match(r"\s*PRAGMA\b", query_upper):
+            self.logger.warning(f"db_query: PRAGMA blocked: {query[:80]}...")
+            return False
 
-        self.logger.warning(f"db_query: operation not in whitelist: {query[:50]}...")
+        # Only allow read-only operations
+        first_word = query_upper.split()[0] if query_upper.split() else ""
+        if first_word in self.ALLOWED_OPERATIONS:
+            return True
+
+        self.logger.warning(f"db_query: operation not in whitelist: {query[:80]}...")
         return False
 
     async def init_db(self):

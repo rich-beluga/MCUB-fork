@@ -10,9 +10,9 @@ import builtins
 import importlib
 import sys
 from ..loader.kernel_proxy import (
+    get_module_client,
     get_module_kernel,
     get_module_register,
-    get_module_client,
 )
 from ..loader.module_base import ModuleBase
 from ..utils.exceptions import CommandConflictError
@@ -182,7 +182,11 @@ class ModuleDetectorMixin:
 
                 module_kernel = get_module_kernel(k, module_class_name, is_system)
                 module_register = get_module_register(k, module_class_name, is_system)
-                instance = cls(module_kernel, k.client, module_register)
+                instance = cls(
+                    module_kernel,
+                    get_module_client(k, module_class_name, is_system),
+                    module_register,
+                )
                 k.logger.debug(
                     "[loader.register_module] class instance created module=%r class=%r",
                     module_name,
