@@ -503,6 +503,15 @@ settings:
     <code>{prefix}{alias}</code>'
   delalias_not_found: ❌ Alias <code>{alias}</code> not found.
   aliases_empty: 📋 No aliases found.
+  iloadalias_usage: '❌ Usage: `{prefix}iloadalias <url>` or reply to a JSON file'
+  iloadalias_fetch_error: ❌ Failed to fetch aliases from <code>{url}</code>
+  iloadalias_invalid_json: ❌ Invalid JSON format
+  iloadalias_invalid_format: ❌ JSON must contain an "aliases" object with alias→command mappings
+  iloadalias_done: '<tg-emoji emoji-id="5902002809573740949">✅</tg-emoji> Imported <b>{count}</b> alias(es)'
+  unla_uploading: '<tg-emoji emoji-id="5465665470560665491">📤</tg-emoji> <b>Exporting aliases...</b>'
+  unla_file_caption: '<tg-emoji emoji-id="5465745157655762334">📄</tg-emoji> <b>Aliases:</b> aliases.json
+
+    <blockquote><code>{prefix}iloadalias</code> to import</blockquote>'
   2fa_enabled: 🔐 Two-factor authentication <tg-emoji emoji-id="5902002809573740949">✅</tg-emoji>
     enabled (inline confirmation)
   2fa_disabled: 🔐 Two-factor authentication ❌ disabled
