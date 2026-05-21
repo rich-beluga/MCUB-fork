@@ -137,7 +137,7 @@ class DatabaseManager:
                         f"db_query: dangerous PRAGMA blocked: {query[:80]}..."
                     )
                     return False
-            # Safe read-only PRAGMA (e.g. table_info, index_list) — allow
+            # Safe read-only PRAGMA (e.g. table_info, index_list) - allow
             return True
 
         # Only allow read-only operations

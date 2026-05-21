@@ -619,7 +619,7 @@ class InlineBot:
         """Configure bot profile, commands, inline mode and inline feedback.
 
         Uses aiogram/Bot API for description and commands, then always
-        runs BotFather config for /setinline and /setinlinefeedback —
+        runs BotFather config for /setinline and /setinlinefeedback -
         the Bot API cannot set those, only BotFather can.
         """
 
