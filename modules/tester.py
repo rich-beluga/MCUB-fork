@@ -71,8 +71,9 @@ CUSTOM_EMOJI = {
 class _FakeEventProxy:
     """Proxies an event and logs all method calls and attribute accesses."""
 
-    def __init__(self, original):
+    def __init__(self, original, *, fake_text=None):
         self._orig = original
+        self._fake_text = fake_text
         self._call_log = []
 
     def _log(self, msg):
@@ -82,6 +83,9 @@ class _FakeEventProxy:
         return list(self._call_log)
 
     def __getattr__(self, name):
+        if name == "text" and self._fake_text is not None:
+            self._log(f"[ATTR] text -> '{self._fake_text}' (fake)")
+            return self._fake_text
         if name.startswith("_"):
             raise AttributeError(name)
         orig_attr = getattr(self._orig, name)
@@ -850,11 +854,13 @@ class TesterMod(ModuleBase):
             return
 
         cmd_name = args.get(0)
-        full_cmd = (
-            event.text.split(maxsplit=1)[1]
-            if len(event.text.split(maxsplit=1)) > 1
-            else cmd_name
-        )
+        prefix = self.get_prefix()
+        cmd_args_raw = event.text[len(prefix) + len("teaser ") :]
+        full_cmd = cmd_args_raw
+
+        # Build fake text as if the command was called directly
+        # e.g. ".teaser reload terminal" -> fake ".reload terminal"
+        fake_text = prefix + cmd_args_raw
 
         handler = self.kernel.command_handlers.get(cmd_name)
         if not handler:
@@ -872,7 +878,7 @@ class TesterMod(ModuleBase):
             self.strings("teaser_recording", cmd=full_cmd), parse_mode="html"
         )
 
-        fake = _FakeEventProxy(event)
+        fake = _FakeEventProxy(event, fake_text=fake_text)
         self.log.info(f"Teaser: executing {full_cmd} with FakeEvent")
 
         try:
@@ -915,11 +921,18 @@ class TesterMod(ModuleBase):
         try:
             tmp.write("<html><body><pre>" + report + "</pre></body></html>")
             tmp.close()
-            await event.edit(
-                self.strings("teaser_done", cmd=full_cmd),
-                file=tmp.name,
-                parse_mode="html",
-            )
+            try:
+                await event.edit(
+                    self.strings("teaser_done", cmd=full_cmd),
+                    file=tmp.name,
+                    parse_mode="html",
+                )
+            except Exception:
+                await event.respond(
+                    self.strings("teaser_done", cmd=full_cmd),
+                    file=tmp.name,
+                    parse_mode="html",
+                )
         finally:
             try:
                 os.unlink(tmp.name)
