@@ -763,9 +763,9 @@ class EventProxy:
 
     __slots__ = (
         "_proxied_event",
-        "_proxy_module_name",
-        "_proxy_kernel",
         "_proxy_client_cache",
+        "_proxy_kernel",
+        "_proxy_module_name",
     )
 
     def __init__(self, event: Any, module_name: str, kernel: Any) -> None:

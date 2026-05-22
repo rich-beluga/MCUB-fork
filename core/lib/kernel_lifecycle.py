@@ -19,8 +19,8 @@ try:
 except ImportError:
     HTML_PARSER_AVAILABLE = False
 from telethon import events, install_uvloop
-from core.lib.loader.kernel_proxy import wrap_event_for_module
 
+from core.lib.loader.kernel_proxy import wrap_event_for_module
 from core.lib.utils.colors import Colors
 from core.lib.utils.logger import KernelLogger, setup_telegram_logging
 from utils.restart import read_restart_context

@@ -1491,7 +1491,10 @@ class Loader(ModuleBase):
             os.makedirs(temp_dir, exist_ok=True)
 
             try:
-                rollback_created_paths: Callable[[], None] = lambda: None
+
+                def rollback_created_paths() -> None:
+                    return None
+
                 archive_path = os.path.join(temp_dir, file_name)
                 await reply.download_media(archive_path)
                 add_log(f"Archive downloaded to {archive_path}")

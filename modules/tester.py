@@ -651,7 +651,9 @@ class TesterMod(ModuleBase):
 
         await self.inline(
             event.chat_id,
-            f"{self.strings('logs_choose_level', paper=CUSTOM_EMOJI['📰'])}\n{self.strings('logs_choose_desc')}",
+            f"{self.strings('logs_choose_level', paper=CUSTOM_EMOJI['📰'])}"
+            + "\n"
+            + f"{self.strings('logs_choose_desc')}",
             buttons=[
                 [
                     self.Button.inline(
@@ -706,7 +708,9 @@ class TesterMod(ModuleBase):
 
         if data_str.startswith("back:") or data_str == "tester_logs:back":
             await call.edit(
-                f"{self.strings('logs_choose_level', paper=CUSTOM_EMOJI['📰'])}\n{self.strings('logs_choose_desc')}",
+                f"{self.strings('logs_choose_level', paper=CUSTOM_EMOJI['📰'])}"
+                + "\n"
+                + f"{self.strings('logs_choose_desc')}",
                 parse_mode="html",
                 buttons=[
                     [
@@ -902,7 +906,7 @@ class TesterMod(ModuleBase):
 
         new_log_entries = ""
         if os.path.exists(kernel_log_path):
-            with open(kernel_log_path, "r", encoding="utf-8", errors="ignore") as f:
+            with open(kernel_log_path, encoding="utf-8", errors="ignore") as f:
                 f.seek(initial_size)
                 new_log_entries = f.read().strip()
 

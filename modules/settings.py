@@ -8,7 +8,6 @@ import os
 import shutil
 
 import aiohttp
-
 from telethon import __version__, events
 from telethon.tl.types import InputMediaWebPage
 

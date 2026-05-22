@@ -513,7 +513,7 @@ def register(kernel):
                 if timeout > 0:
                     try:
                         await asyncio.wait_for(process.wait(), timeout=timeout)
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         process.kill()
                         stdout, stderr = await process.communicate()
                     else:
