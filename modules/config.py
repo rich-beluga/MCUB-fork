@@ -9,7 +9,7 @@ import html
 
 # author: @Hairpin00
 # version: 1.3.0
-# description: Module config management / Упpaвлeниe кoнфигaми мoдyлeй
+# description: Module config management
 import json
 import re
 import time

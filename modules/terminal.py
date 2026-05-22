@@ -6,7 +6,7 @@ from __future__ import annotations
 # requires:
 # author: @Hairpin00
 # version: 2.0.0
-# description: Terminal commands with real-time output streaming / Тepминaл c пoтoкoвым вывoдoм
+# description: Terminal commands with real-time output streaming
 import asyncio
 import html
 import os
@@ -53,7 +53,7 @@ CUSTOM_EMOJI = {
     "✅": '<tg-emoji emoji-id="5118861066981344121">✅</tg-emoji>',
 }
 
-# ---- output filter helpers ----
+# output filter helpers
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mABCDEFGHJKSTfhilmnprsu]")
 
@@ -115,7 +115,7 @@ def _apply_output_filters(text: str, cfg) -> str:
     return text
 
 
-# ---- shell helpers ----
+# shell helpers
 
 
 def _get_shell_path(cfg) -> str:
