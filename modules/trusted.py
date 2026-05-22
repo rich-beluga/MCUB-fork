@@ -54,17 +54,20 @@ ACCESS_CATEGORIES = {
             "piped",
             "api_reset",
             "api_suspend",
+            "unla",
+            "iloadalias",
+            "logs",
         ],
     },
     "backup": {
         "en": {"label": "Backups", "desc": "database and modules backup"},
         "ru": {"label": "Бэкaпы", "desc": "peзepвныe кoпии бaзы и мoдyлeй"},
-        "commands": ["backup", "restore", "backupsettings", "backuptime"],
+        "commands": ["backup", "restore", "restore_with", "backuptime"],
     },
     "terminal": {
         "en": {"label": "Terminal", "desc": "system shell commands on server"},
         "ru": {"label": "Тepминaл", "desc": "cиcтeмныe shell-кoмaнды нa cepвepe"},
-        "commands": ["t", "tkill"],
+        "commands": ["t", "tkill", "write"],
     },
     "eval": {
         "en": {"label": "Code / Eval", "desc": "eval and code execution"},
@@ -341,8 +344,18 @@ def register(kernel):
         return None
 
     def _get_command_category(cmd: str) -> str:
-        """Return category key for a command; unknown commands are denied by default."""
-        return _CMD_TO_CAT.get(cmd, "unknown")
+        """Return category key for a command.
+
+        Commands explicitly listed in ACCESS_CATEGORIES go to their own category.
+        Any other registered kernel command falls under 'modules' (is_module_cmds=True).
+        Commands not registered in the kernel at all are denied ('unknown').
+        """
+        result = _CMD_TO_CAT.get(cmd)
+        if result:
+            return result
+        if hasattr(kernel, "command_handlers") and cmd in kernel.command_handlers:
+            return "modules"
+        return "unknown"
 
     def _build_access_text(
         user_display: str, access: dict, group_access: dict | None = None
@@ -1469,7 +1482,14 @@ def register(kernel):
         sender_has_nonick = sender_id in nonick_list
 
         if not has_alias and not sender_has_nonick:
-            return
+            # Allow the owner/admin to bypass the alias/nonick requirement.
+            # Owner messages in groups arrive as non-outgoing (out=False) so the
+            # core message_handler skips them.  The trusted watcher is the fallback
+            # path — but without this exemption the owner too would need either the
+            # @owner_username suffix or nonick membership to use short commands.
+            admin_id = getattr(kernel, "ADMIN_ID", None)
+            if sender_id != admin_id:
+                return
 
         all_aliases = kernel.register.get_all_aliases()
         resolved_cmd = _trusted_resolve_alias(kernel, actual_cmd)
