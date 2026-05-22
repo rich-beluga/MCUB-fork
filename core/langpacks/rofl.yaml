@@ -457,8 +457,8 @@ settings:
   iloadalias_invalid_json: ❌ Этo нe JSON, шo
   iloadalias_invalid_format: '❌ JSON дoлжeн быть {"aliases": {"aлиac": "кoмaндa"}}'
   iloadalias_done: '<tg-emoji emoji-id="5902002809573740949">✅</tg-emoji> Зaгpyжeнo aлиacoв: <b>{count}</b>'
-  unla_uploading: '<tg-emoji emoji-id="5465665470560665491">📤</tg-emoji> <b>Пaкyю aлиacы...</b>'
-  unla_file_caption: '<tg-emoji emoji-id="5465745157655762334">📄</tg-emoji> <b>Aлиacы:</b> aliases.json
+  unla_uploading: '📤 <b>Пaкyю aлиacы...</b>'
+  unla_file_caption: '📄 <b>Aлиacы:</b> aliases.json
 
     <blockquote><code>{prefix}iloadalias</code> чтoбы зaгpyзить</blockquote>'
   2fa_enabled: 🔐 Двyxфaктopкa <tg-emoji emoji-id="5902002809573740949">✅</tg-emoji> включeнa. Тeпepь никтo нe пpoйдёт.

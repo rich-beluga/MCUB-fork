@@ -477,8 +477,8 @@ settings:
   iloadalias_invalid_json: '❌ EILSEQ: invalid JSON format'
   iloadalias_invalid_format: '❌ EINVAL: JSON must contain "aliases" mapping'
   iloadalias_done: '<tg-emoji emoji-id="5902002809573740949">✅</tg-emoji> aliases loaded: <b>{count}</b>'
-  unla_uploading: '<tg-emoji emoji-id="5465665470560665491">📤</tg-emoji> <b>exporting aliases...</b>'
-  unla_file_caption: '<tg-emoji emoji-id="5465745157655762334">📄</tg-emoji> <b>Aliases:</b> aliases.json
+  unla_uploading: '📤 <b>exporting aliases...</b>'
+  unla_file_caption: '📄 <b>Aliases:</b> aliases.json
 
     <blockquote><code>{prefix}iloadalias</code> to import</blockquote>'
   2fa_enabled: 🔐 2FA <tg-emoji emoji-id="5902002809573740949">✅</tg-emoji> enabled (PAM inline confirmation)
