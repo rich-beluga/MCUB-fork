@@ -4,6 +4,7 @@
 # requires: cryptography
 
 from __future__ import annotations
+from utils.strings import Strings
 
 import asyncio
 import fnmatch
@@ -218,7 +219,7 @@ class Backup(ModuleBase):
         ),
     )
 
-    strings = {"name": "userbot_backup"}
+    strings: dict | Strings = {"name": "userbot_backup"}
     # OLD strings removed after migration to langpacks - kept for reference
     """
     _OLD_STRINGS = {

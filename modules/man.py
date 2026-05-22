@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
+from utils.strings import Strings
 
 import asyncio
 import json
@@ -58,7 +59,7 @@ class ManModule(ModuleBase):
     author = "@hairpin00"
     description = {"ru": "Meнeджep мoдyлeй", "en": "Module manager"}
 
-    strings = {"name": "man"}
+    strings: dict | Strings = {"name": "man"}
 
     config = ModuleConfig(
         ConfigValue(

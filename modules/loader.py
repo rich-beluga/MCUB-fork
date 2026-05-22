@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
+from utils.strings import Strings
 
 # author: @Hairpin00
 # version: 1.1.5
@@ -156,7 +157,7 @@ class Loader(ModuleBase):
         ),
     )
 
-    strings = {"name": "loader"}
+    strings: dict | Strings = {"name": "loader"}
 
     async def on_load(self) -> None:
         await super().on_load()

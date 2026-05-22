@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
+from utils.strings import Strings
 
 import ast
 import asyncio
@@ -37,7 +38,7 @@ class UtilsPiped(ModuleBase):
     author = "@Hairpin00"
     description = {"ru": "Утилиты для кoнвeйepa", "en": "Utils for pipeline"}
 
-    strings = {"name": "utils_piped"}
+    strings: dict | Strings = {"name": "utils_piped"}
 
     @command(
         "echo",

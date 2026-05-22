@@ -1143,11 +1143,11 @@ class ModuleBase(ABC):
         return self._config
 
     @property
-    def strings(self) -> Any:
+    def strings(self) -> Strings:
         """Expose strings object to module methods."""
         return self._get_strings()
 
-    def _get_strings(self) -> Any:
+    def _get_strings(self) -> Strings:
         if isinstance(self._strings, dict):
             try:
                 strings_dict = copy.deepcopy(self._strings)

@@ -22,6 +22,7 @@ except ImportError:
 from telethon.tl.types import InputMediaWebPage
 
 import utils
+from utils.strings import Strings
 from core.lib.loader.module_base import ModuleBase, callback, command
 from core.lib.loader.module_config import (
     Boolean,
@@ -208,7 +209,7 @@ class TesterMod(ModuleBase):
         ),
     )
 
-    strings: dict[str, dict[str, str]] = {"name": "tester"}
+    strings: dict[str, dict[str, str]] | Strings = {"name": "tester"}
 
     log_level_pattern = re.compile(r"^\d{4}-\d{2}-\d{2} .* \[([A-Z]+)\] ")
     log_level_labels = ["debug", "info", "warning", "error", "critical", "all"]

@@ -14,6 +14,7 @@ from telethon.tl.types import InputMediaWebPage
 
 import core.lib.loader.module_base as loader
 from utils.restart import restart_kernel
+from utils.strings import Strings
 
 
 class UpdatesMod(loader.ModuleBase):
@@ -22,7 +23,7 @@ class UpdatesMod(loader.ModuleBase):
     version = "1.0.6"
     author = "@Hairpin00"
 
-    strings = {"name": "updates"}
+    strings: dict | Strings = {"name": "updates"}
 
     def _s(self, key: str, **kwargs: Any) -> str:
         """Return a localized string without confusing static analyzers."""

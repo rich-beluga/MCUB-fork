@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
+from utils.strings import Strings
 
 import asyncio
 import html
@@ -39,7 +40,7 @@ class LogBot(ModuleBase):
     author = "@Hairpin00"
     version = "1.1.0"
 
-    strings = {"name": "log_bot"}
+    strings: dict | Strings = {"name": "log_bot"}
 
     config = ModuleConfig(
         ConfigValue(

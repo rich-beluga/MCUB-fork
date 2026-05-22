@@ -18,6 +18,7 @@ import psutil
 from telethon.tl.types import InputMediaWebPage, MessageEntityTextUrl
 
 import utils
+from utils.strings import Strings
 from core.lib.loader.module_base import ModuleBase, command
 from core.lib.loader.module_config import (
     Boolean,
@@ -159,7 +160,7 @@ class MCUBInfoMod(ModuleBase):
         ),
     )
 
-    strings: dict[str, dict[str, str]] = {"name": "mcub_info"}
+    strings: dict[str, dict[str, str]] | Strings = {"name": "mcub_info"}
 
     def _get_branch(self) -> str:
         return _detect_branch_sync()

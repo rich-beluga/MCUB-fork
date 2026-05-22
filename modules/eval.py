@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
+from utils.strings import Strings
 
 import html
 import io
@@ -29,7 +30,7 @@ class EvalModule(ModuleBase):
     author = "@hairpin00"
     description = {"ru": "Выпoлнeниe Python кoдa", "en": "Python code execution"}
 
-    strings = {"name": "eval"}
+    strings: dict | Strings = {"name": "eval"}
 
     @command(
         "py",

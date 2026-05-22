@@ -14,6 +14,7 @@ from telethon.tl.types import InputMediaWebPage
 from core.lib.loader.module_base import ModuleBase, callback, command
 from core.lib.loader.module_config import Boolean, ConfigValue, ModuleConfig
 from utils.strings import get_available_locales
+from utils.strings import Strings
 
 
 class SettingsModule(ModuleBase):
@@ -25,7 +26,7 @@ class SettingsModule(ModuleBase):
         "en": "Settings module (prefix, aliases, language)",
     }
 
-    strings = {"name": "settings"}
+    strings: dict | Strings = {"name": "settings"}
 
     config = ModuleConfig(
         ConfigValue(

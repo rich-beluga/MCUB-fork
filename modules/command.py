@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
+from utils.strings import Strings
 
 import asyncio
 
@@ -16,7 +17,7 @@ class CommandModule(ModuleBase):
     author = "@hairpin00"
     description = {"ru": "Oбpaбoтчики кoмaнд бoтa", "en": "Bot command handlers"}
 
-    strings = {"name": "command"}
+    strings: dict | Strings = {"name": "command"}
 
     async def on_load(self) -> None:
         bot_client = getattr(self.kernel, "bot_client", None)
@@ -175,7 +176,6 @@ class CommandModule(ModuleBase):
         strings_dict = type(self).__dict__.get("strings")
 
         # Create new Strings instance with new language
-        from utils.strings import Strings
 
         if strings_dict:
             self._strings = Strings(self.kernel, strings_dict)

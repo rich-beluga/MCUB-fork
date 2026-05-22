@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
+from utils.strings import Strings
 
 import asyncio
 import json
@@ -24,7 +25,7 @@ class TrModule(ModuleBase):
         "en": "Translator using Google Translate API",
     }
 
-    strings = {"name": "tr"}
+    strings: dict | Strings = {"name": "tr"}
 
     EMOJI_LOADING = '<tg-emoji emoji-id="5323463142775202324">🏓</tg-emoji>'
     EMOJI_ERROR = '<tg-emoji emoji-id="5388785832956016892">❌</tg-emoji>'
