@@ -439,7 +439,8 @@ class Register:
         """Update the reverse module→commands index when a command is registered."""
         index = getattr(self.kernel, "_module_commands_index", None)
         if index is None:
-            return
+            index = {}
+            self.kernel._module_commands_index = index
         if owner is None:
             return
         if cmd not in index.get(owner, []):

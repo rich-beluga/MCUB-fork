@@ -115,6 +115,7 @@ class KernelCoreMixin:
         self.inline_handlers_owners = {}
         self.callback_handlers = {}
         self.aliases = {}
+        self._module_commands_index = {}
         self._pipe_vars = {}
         self._pipe_macros = {}
 
