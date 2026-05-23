@@ -270,18 +270,36 @@ class KernelLifecycleMixin:
                                 f"Could not edit error message: {edit_err}"
                             )
 
-        logo = (
-            f"\n _    _  ____ _   _ ____\n"
-            f"| \\  / |/ ___| | | | __ )\n"
-            f"| |\\/| | |   | | | |  _ \\\n"
-            f"| |  | | |___| |_| | |_) |\n"
-            f"|_|  |_|\\____|\\___/|____/\n"
-            f"Kernel loaded.\n\n"
+        _logo_art = (
+            " _    _  ____ _   _ ____\n"
+            "| \\  / |/ ___| | | | __ )\n"
+            "| |\\/| | |   | | | |  _ \\\n"
+            "| |  | | |___| |_| | |_) |\n"
+            "|_|  |_|\\____|\\___/|____/"
+        )
+        _info = (
+            f"\nKernel loaded.\n\n"
             f"• Version: {self.VERSION}\n"
             f"• Prefix: {self.custom_prefix}\n"
         )
-        if self.error_load_modules:
-            logo += f"• Module load errors: {self.error_load_modules}\n"
+        _errors = (
+            Colors.paint(
+                f"• Module load errors: {self.error_load_modules}\n",
+                Colors.BOLD,
+                Colors.BRIGHT_RED,
+            )
+            if self.error_load_modules
+            else ""
+        )
+        logo = (
+            "\n"
+            + Colors.gradient_multicolor(
+                _logo_art + _info,
+                [(200, 0, 0), (230, 60, 0), (255, 140, 0), (220, 220, 220)],
+                bold=True,
+            )
+            + _errors
+        )
         print(logo)
         self.logger.info("Start MCUB!")
         del logo
