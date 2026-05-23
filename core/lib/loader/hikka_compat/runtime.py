@@ -903,7 +903,7 @@ class _CompatLoaderProxy:
         is_system: bool = False,
         **kwargs,
     ):
-        loader = getattr(self._kernel, "loader", None)
+        loader = getattr(self._kernel, "_loader", None)
         if loader is not None and hasattr(loader, "load_module_from_file"):
             return await loader.load_module_from_file(path, module_name, is_system)
         return (False, "Loader not available")

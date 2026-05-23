@@ -1712,6 +1712,18 @@ async def load_hikka_module(
             f"[hikka_compat] Detected GeekTG module '{module_name}', applying compatibility transform"
         )
         source = _geek_compat.compat(source)
+    elif module_type == "native":
+        kernel.logger.debug(
+            f"[hikka_compat] Module '{module_name}' detected as native, "
+            "delegating to native loader"
+        )
+        loader = getattr(kernel, "_loader", None)
+        if loader is not None and hasattr(loader, "load_module_from_file"):
+            ok, msg = await loader.load_module_from_file(
+                file_path, module_name, is_system=False
+            )
+            return ok, msg, {}
+        return False, "Native loader not available", {}
 
     try:
         code = compile(source, file_path, "exec")
