@@ -14,8 +14,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
-import aiohttp
-
 from ..utils.exceptions import CommandConflictError
 from .module_utils import (
     find_module_case_insensitive as _find_module_case_insensitive,
@@ -348,11 +346,9 @@ class ModuleLoaderMixin:
         except Exception:
             language_base = None
 
-        commands = [
-            cmd
-            for cmd, owner in getattr(k, "command_owners", {}).items()
-            if owner == module_name
-        ]
+        # Use reverse index (built in register.py) for O(1) lookup
+        module_index = getattr(k, "_module_commands_index", {})
+        commands = list(module_index.get(module_name, []))
 
         aliases_info: dict[str, list[str]] = {}
         for alias, target in getattr(k, "aliases", {}).items():
@@ -834,6 +830,8 @@ class ModuleLoaderMixin:
                 base = os.path.basename(parsed.path)
                 module_name = os.path.splitext(base)[0] or "unnamed_module"
 
+            import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, timeout=30) as resp:
                     if resp.status != 200:
@@ -913,6 +911,8 @@ class ModuleLoaderMixin:
         k.logger.debug(f"[Loader] install_from_archive start url={url}")
 
         try:
+            import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, timeout=60) as resp:
                     if resp.status != 200:

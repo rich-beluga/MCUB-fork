@@ -34,6 +34,9 @@ class UserLoaderMixin:
              in parallel before any module is executed.
           2. Load modules concurrently (up to _LOAD_CONCURRENCY at a time) so
              async parts (run_post_load, etc.) can overlap.
+
+        Phase 1 reads every file once and caches the content so that
+        Phase 2 (``_load_single_user_module``) does **not** re-read it.
         """
         k = self.k
 
@@ -41,11 +44,19 @@ class UserLoaderMixin:
         if callable(purge_stale_modules):
             cast(Callable[[], None], purge_stale_modules)()
 
-        try:
-            from core.lib.loader.hikka_compat import is_hikka_module, load_hikka_module
+        # Hikka-compat can be disabled via config for faster startup
+        _hikka_compat = getattr(k, "config", {}).get("hikka_compat", True)
+        if _hikka_compat:
+            try:
+                from core.lib.loader.hikka_compat import (
+                    is_hikka_module,
+                    load_hikka_module,
+                )
 
-            _hikka_compat = True
-        except ImportError:
+                _hikka_compat = True
+            except ImportError:
+                _hikka_compat = False
+        else:
             _hikka_compat = False
 
         files = os.listdir(k.MODULES_LOADED_DIR)
@@ -53,10 +64,10 @@ class UserLoaderMixin:
             files.remove("log_bot.py")
             files.insert(0, "log_bot.py")
 
-        # ── Phase 1: batch pre-install ───────────────────────────────────────
-        # Read every .py file, collect all requirements, install missing deps
-        # in parallel before we touch any module loader.
+        # ── Phase 1: batch pre-install + cache file contents ─────────────────
+        # Read every .py file **once**, cache code for phase 2.
         modules_code: list[tuple[str, str]] = []
+        code_cache: dict[str, str] = {}  # filename -> code
         for file_name in files:
             module_path = os.path.join(k.MODULES_LOADED_DIR, file_name)
             if os.path.isdir(module_path):
@@ -67,6 +78,7 @@ class UserLoaderMixin:
                 with open(module_path, encoding="utf-8") as f:
                     code = f.read()
                 modules_code.append((file_name[:-3], code))
+                code_cache[file_name] = code
             except OSError:
                 pass
 
@@ -79,7 +91,10 @@ class UserLoaderMixin:
 
         async def _load_one(file_name: str) -> None:
             async with semaphore:
-                await self._load_single_user_module(file_name, k, _hikka_compat)
+                cached_code = code_cache.get(file_name)
+                await self._load_single_user_module(
+                    file_name, k, _hikka_compat, cached_code=cached_code
+                )
 
         # Package directories first (they have an __init__.py)
         pkg_tasks = []
@@ -112,14 +127,25 @@ class UserLoaderMixin:
         await asyncio.gather(*pkg_tasks, *file_tasks)
 
     async def _load_single_user_module(
-        self, file_name: str, k: Any, _hikka_compat: bool
+        self,
+        file_name: str,
+        k: Any,
+        _hikka_compat: bool,
+        *,
+        cached_code: str | None = None,
     ) -> None:
-        """Load one user module file.  Called concurrently from load_user_modules."""
+        """Load one user module file.  Called concurrently from load_user_modules.
+
+        If *cached_code* is provided (from Phase 1), the file is **not** re-read.
+        """
         module_name = file_name[:-3]
         file_path = os.path.join(k.MODULES_LOADED_DIR, file_name)
         try:
-            with open(file_path, encoding="utf-8") as f:
-                code = f.read()
+            if cached_code is not None:
+                code = cached_code
+            else:
+                with open(file_path, encoding="utf-8") as f:
+                    code = f.read()
 
             if _hikka_compat:
                 from core.lib.loader.hikka_compat import (
