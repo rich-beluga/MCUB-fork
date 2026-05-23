@@ -596,34 +596,40 @@ class ModuleLoaderMixin:
             if not ok:
                 return False, f"Kernel version mismatch: {msg}"
 
-            incompatible = [
-                "from .. import",
-                "import loader",
-                "__import__('loader')",
-                "from hikkalt import",
-                "from herokult import",
-            ]
-            for pat in incompatible:
-                if pat in code:
-                    try:
-                        import os as _os
+            # If AST detection already classified as native, skip text-based
+            # Hikka fallback — the text patterns can match string literals inside
+            # the module's own code (e.g. compat_markers), causing recursion.
+            if module_type != "native":
+                incompatible = [
+                    "from .. import",
+                    "import loader",
+                    "__import__('loader')",
+                    "from hikkalt import",
+                    "from herokult import",
+                ]
+                for pat in incompatible:
+                    if pat in code:
+                        try:
+                            import os as _os
 
-                        from core.lib.loader.hikka_compat import (
-                            load_hikka_module,
-                        )
+                            from core.lib.loader.hikka_compat import (
+                                load_hikka_module,
+                            )
 
-                        abs_path = (
-                            file_path
-                            if _os.path.isabs(file_path)
-                            else _os.path.abspath(file_path)
-                        )
-                        ok, err, _ = await load_hikka_module(k, abs_path, module_name)
-                        return ok, err
-                    except ImportError:
-                        return (
-                            False,
-                            "Incompatible module (Heroku/hikka style not supported)",
-                        )
+                            abs_path = (
+                                file_path
+                                if _os.path.isabs(file_path)
+                                else _os.path.abspath(file_path)
+                            )
+                            ok, err, _ = await load_hikka_module(
+                                k, abs_path, module_name
+                            )
+                            return ok, err
+                        except ImportError:
+                            return (
+                                False,
+                                "Incompatible module (Heroku/hikka style not supported)",
+                            )
 
             sys.modules.pop(module_name, None)
 

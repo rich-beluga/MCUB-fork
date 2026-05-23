@@ -53,7 +53,7 @@ def purge_caches(kernel: Any, level: int = 1) -> dict[str, Any]:
     cleared: list[str] = []
     db = getattr(kernel, "db_manager", None)
 
-    # ── Level 1: Safe caches ──────────────────────────────────────────────
+    # Level 1: Safe caches
     # TTLCache
     ttl = getattr(kernel, "cache", None)
     if ttl and hasattr(ttl, "clear"):
@@ -113,7 +113,7 @@ def purge_caches(kernel: Any, level: int = 1) -> dict[str, Any]:
             _dict_clear(mod_instance, reg_attr)
             cleared.append(f"inline_temp:{getattr(mod_instance, 'name', '?')}")
 
-    # ── Level 2: Extended ─────────────────────────────────────────────────
+    # Level 2: Extended
     if level >= 2:
         # Callback permissions
         perms = getattr(kernel, "callback_permissions", None)
@@ -151,7 +151,7 @@ def purge_caches(kernel: Any, level: int = 1) -> dict[str, Any]:
         if stale_mods:
             cleared.append(f"stale_sys_modules:{len(stale_mods)}")
 
-    # ── Level 3: Hardcore ──────────────────────────────────────────────────
+    # Level 3: Hardcore
     if level >= 3:
         # Generational GC sweep (all 3 generations)
         for _ in range(3):
