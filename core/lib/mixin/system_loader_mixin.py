@@ -30,6 +30,9 @@ class SystemLoaderMixin:
 
         Two-phase: pre-install all deps in parallel, then load modules
         concurrently (up to _LOAD_CONCURRENCY at a time).
+
+        Phase 1 reads every file once and caches the content so that
+        Phase 2 (``_load_single_system_module``) does not re-read it.
         """
         k = self.k
 
@@ -39,14 +42,16 @@ class SystemLoaderMixin:
             if f.endswith(".py") and f != "__init__.py"
         ]
 
-        # Phase 1: batch pre-install all deps across all system modules
+        # Phase 1: batch pre-install all deps + cache file contents
         modules_code: list[tuple[str, str]] = []
+        code_cache: dict[str, str] = {}  # filename -> code, avoids re-read
         for file_name in files:
             file_path = os.path.join(k.MODULES_DIR, file_name)
             try:
                 with open(file_path, encoding="utf-8") as f:
                     code = f.read()
                 modules_code.append((file_name[:-3], code))
+                code_cache[file_name] = code
             except OSError:
                 pass
 
@@ -54,23 +59,34 @@ class SystemLoaderMixin:
         if callable(batch_install):
             await batch_install(modules_code)
 
-        # Phase 2: load concurrently
+        # Phase 2: load concurrently (pass code_cache so no re-read)
         semaphore = asyncio.Semaphore(_LOAD_CONCURRENCY)
 
         async def _load_one(file_name: str) -> None:
             async with semaphore:
-                await self._load_single_system_module(file_name, k)
+                cached_code = code_cache.get(file_name)
+                await self._load_single_system_module(
+                    file_name, k, cached_code=cached_code
+                )
 
         await asyncio.gather(*[_load_one(f) for f in files])
 
-    async def _load_single_system_module(self, file_name: str, k) -> None:
-        """Load one system module file.  Called concurrently from load_system_modules."""
+    async def _load_single_system_module(
+        self, file_name: str, k, *, cached_code: str | None = None
+    ) -> None:
+        """Load one system module file.  Called concurrently from load_system_modules.
+
+        If *cached_code* is provided, the file is **not** re-read from disk.
+        """
         module_name = file_name[:-3]
         original_module_name = module_name
         file_path = os.path.join(k.MODULES_DIR, file_name)
         try:
-            with open(file_path, encoding="utf-8") as f:
-                code = f.read()
+            if cached_code is not None:
+                code = cached_code
+            else:
+                with open(file_path, encoding="utf-8") as f:
+                    code = f.read()
 
             # Deps pre-installed in phase 1; fast no-op for already-installed packages.
             await self.pre_install_requirements(code, module_name)
