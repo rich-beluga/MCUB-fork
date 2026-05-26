@@ -113,6 +113,14 @@ ACCESS_CATEGORIES = {
         "ru": {"label": "Callback", "desc": "нaжимaть нa callback-кнoпки"},
         "commands": [],
     },
+    "aliases": {
+        "en": {"label": "Aliases", "desc": "use command aliases and shortcuts"},
+        "ru": {
+            "label": "Алиасы",
+            "desc": "использовать алиасы и сокращения команд",
+        },
+        "commands": [],
+    },
 }
 
 # Flat map: command → category key (built once at import time)
@@ -128,6 +136,7 @@ _CATEGORY_ROWS = [
     ("terminal", "eval"),
     ("security", "system"),
     ("inline", "callback"),
+    ("aliases",),
 ]
 
 # Presets
@@ -266,20 +275,25 @@ def register(kernel):
         await kernel.db_set("trusted", "sgroups", json.dumps(groups))
 
     async def get_access(user_id: int) -> dict:
-        """Return per-user access dict. Defaults: all False."""
+        """Return per-user access dict. Defaults: all False, aliases True."""
         data = await kernel.db_get("trusted_access", str(user_id))
+        _defaults = dict.fromkeys(ACCESS_CATEGORIES, False)
+        _defaults["aliases"] = True  # backward compatibility
         if not data:
-            return dict.fromkeys(ACCESS_CATEGORIES, False)
+            return _defaults
         try:
             stored = (
                 json.loads(data) if isinstance(data, str) else json.loads(str(data))
             )
             if not isinstance(stored, dict):
-                return dict.fromkeys(ACCESS_CATEGORIES, False)
-            # Fill any missing keys with False
-            return {cat: stored.get(cat, False) for cat in ACCESS_CATEGORIES}
+                return _defaults
+            # Fill any missing keys with False; aliases defaults to True
+            return {
+                cat: stored.get(cat, True if cat == "aliases" else False)
+                for cat in ACCESS_CATEGORIES
+            }
         except Exception:
-            return dict.fromkeys(ACCESS_CATEGORIES, False)
+            return _defaults
 
     async def save_access(user_id: int, access: dict):
         await kernel.db_set("trusted_access", str(user_id), json.dumps(access))
@@ -1473,6 +1487,7 @@ def register(kernel):
 
         has_alias = False
         actual_cmd = cmd_token
+        resolved_cmd = actual_cmd
 
         if owner_alias and cmd_token.lower().endswith(owner_alias.lower()):
             stripped = cmd_token[: -len(owner_alias)]
@@ -1493,16 +1508,17 @@ def register(kernel):
             if sender_id != admin_id:
                 return
 
-        all_aliases = kernel.register.get_all_aliases()
-        resolved_cmd = _trusted_resolve_alias(kernel, actual_cmd)
-        if resolved_cmd in all_aliases:
-            resolved_cmd = all_aliases[resolved_cmd]
+        access = await get_access(sender_id)
+
+        if access.get("aliases", True):
+            all_aliases = kernel.register.get_all_aliases()
+            resolved_cmd = _trusted_resolve_alias(kernel, actual_cmd)
+            if resolved_cmd in all_aliases:
+                resolved_cmd = all_aliases[resolved_cmd]
 
         category = _get_command_category(resolved_cmd)
         if category == "unknown":
             return
-
-        access = await get_access(sender_id)
 
         cmd_access = await get_cmd_access(sender_id)
         user_has_access = False
