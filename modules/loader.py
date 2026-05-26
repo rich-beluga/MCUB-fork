@@ -1462,6 +1462,13 @@ class Loader(ModuleBase):
             return
 
         reply = await event.get_reply_message()
+        if reply is None:
+            await self._edit_with_emoji(
+                event,
+                self.strings("reply_to_py", warning=CUSTOM_EMOJI["warning"]),
+            )
+            return
+
         file_name = next(
             (
                 getattr(attr, "file_name", None)
