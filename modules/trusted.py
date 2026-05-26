@@ -1545,7 +1545,9 @@ def register(kernel):
                 self._msg = msg
 
             def __getattr__(self, name):
-                return getattr(self._msg, name)
+                if self._msg is None:
+                    return None
+                return getattr(self._msg, name, None)
 
             @property
             def message(self):
@@ -1562,7 +1564,9 @@ def register(kernel):
 
             @property
             def document(self):
-                return getattr(self._msg, "document")
+                if self._msg is None:
+                    return None
+                return getattr(self._msg, "document", None)
 
             async def edit(self, *args, **kwargs):
                 return await self._msg.edit(*args, **kwargs)
