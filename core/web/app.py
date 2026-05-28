@@ -29,6 +29,7 @@ def create_app(kernel=None, setup_event=None) -> web.Application:
     app = web.Application()
     app["kernel"] = kernel
     app["setup_event"] = setup_event
+    app["setup_mode"] = kernel is None
     logger.debug(
         "Creating web app kernel_present=%s setup_event_present=%s",
         kernel is not None,
@@ -64,7 +65,7 @@ def create_app(kernel=None, setup_event=None) -> web.Application:
 
 async def start_web_panel(kernel, host: str | None = None, port: int | None = None):
     """Start the web panel as a background coroutine."""
-    host = host or os.environ.get("MCUB_HOST", "0.0.0.0")
+    host = host or os.environ.get("MCUB_HOST", "127.0.0.1")
     port = int(port or os.environ.get("MCUB_PORT", 8080))
     kernel.logger.debug("Starting web panel host=%s port=%s", host, port)
 
