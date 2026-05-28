@@ -109,7 +109,12 @@ class InfiniteLoop:
                             f"InfiniteLoop error in '{self.func.__name__}': {exc}"
                         )
                         if hasattr(self._kernel, "handle_error"):
-                            await self._kernel.handle_error(exc, source="infinite_loop")
+                            try:
+                                await self._kernel.handle_error(
+                                    exc, source="infinite_loop"
+                                )
+                            except Exception:
+                                pass
                 if not self._wait_before:
                     await asyncio.sleep(self.interval)
         finally:
