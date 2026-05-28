@@ -57,7 +57,7 @@ class UtilsPiped(ModuleBase):
             event.no_add_args_to_input = True
 
             if not text:
-                await self.edit(event, "")
+                await self.edit(event, f"{self.kernel.custom_prefix}echo <text>")
                 return
 
             if getattr(event, "piped", False):

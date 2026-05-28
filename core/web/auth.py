@@ -36,17 +36,19 @@ class AuthMiddleware:
         "/",
         "/static",
         "/static/img",
-        "/setup/reset",
     }
 
     PUBLIC_API_PATHS = {
         "/api/setup/send_code",
         "/api/setup/verify_code",
+        "/api/setup/qr_login",
+        "/api/setup/qr_poll",
         "/api/setup/state",
         "/api/setup/complete",
         "/api/bot/verify_token",
         "/api/bot/save_token",
         "/api/bot/auto_create",
+        "/api/setup/prefill",
     }
 
     def __init__(self, app: web.Application):
@@ -91,9 +93,7 @@ class AuthMiddleware:
             return True
         if path.startswith("/static"):
             return True
-        if path in self.PUBLIC_API_PATHS:
-            return True
-        if path.startswith("/api/setup"):
+        if path in self.PUBLIC_API_PATHS and self.app.get("setup_mode", False):
             return True
         return False
 
@@ -135,7 +135,9 @@ class AuthMiddleware:
         token = auth_header[7:]
         provided_hash = hash_token(token)
 
-        return provided_hash == self.token_hash
+        return bool(self.token_hash) and secrets.compare_digest(
+            provided_hash, self.token_hash
+        )
 
     async def __call__(self, app: web.Application) -> None:
         """Backward-compatible middleware installer."""

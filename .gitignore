@@ -6,6 +6,7 @@ openagent_*/
 *cache/
 *tmp/
 __pycache__/
+.opencode-home/
 *.pyc
 *.pyo
 *.log

@@ -20,8 +20,10 @@ class FakeAiohttpApp(dict):
         self.middlewares = []
 
 
-def make_auth(token: str | None = "dev-token") -> AuthMiddleware:
-    app = {"kernel": SimpleNamespace(config={})}
+def make_auth(
+    token: str | None = "dev-token", *, setup_mode: bool = False
+) -> AuthMiddleware:
+    app = {"kernel": SimpleNamespace(config={}), "setup_mode": setup_mode}
     if token is not None:
         app["kernel"].config["web_panel_token"] = token
     return AuthMiddleware(app)  # type: ignore[arg-type]
@@ -53,11 +55,10 @@ def test_auth_middleware_rejects_missing_or_invalid_token():
 
 
 def test_setup_and_bot_paths_stay_public_for_low_friction_setup():
-    auth = make_auth("secret-token")
+    auth = make_auth("secret-token", setup_mode=True)
 
     public_paths = [
         "/",
-        "/setup/reset",
         "/api/setup/state",
         "/api/setup/send_code",
         "/api/bot/save_token",
@@ -66,6 +67,7 @@ def test_setup_and_bot_paths_stay_public_for_low_friction_setup():
     for path in public_paths:
         assert auth._is_public_path(path) is True
 
+    assert auth._is_public_path("/setup/reset") is False
     assert auth._is_public_path("/api/modules") is False
 
 
@@ -116,7 +118,7 @@ def test_auth_middleware_rejects_protected_request_before_handler():
 
 
 def test_auth_middleware_allows_public_request_to_handler():
-    auth = make_auth("secret-token")
+    auth = make_auth("secret-token", setup_mode=True)
     request = SimpleNamespace(path="/api/setup/state", headers=CIMultiDict())
     handler = AsyncMock(return_value=web.json_response({"ok": True}))
 
@@ -127,7 +129,7 @@ def test_auth_middleware_allows_public_request_to_handler():
 
 
 def test_bot_start_and_status_paths_require_auth():
-    auth = make_auth("secret-token")
+    auth = make_auth("secret-token", setup_mode=True)
 
     assert auth._is_public_path("/api/bot/verify_token") is True
     assert auth._is_public_path("/api/bot/save_token") is True

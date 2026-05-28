@@ -7,6 +7,7 @@ from __future__ import annotations
 # version: 1.4.0-beta
 # description: Trusted users can execute owner commands
 import json
+import traceback
 
 from core.langpacks import get_all_module_strings
 from core_inline.api.inline import make_cb_button
@@ -112,6 +113,14 @@ ACCESS_CATEGORIES = {
         "ru": {"label": "Callback", "desc": "нaжимaть нa callback-кнoпки"},
         "commands": [],
     },
+    "aliases": {
+        "en": {"label": "Aliases", "desc": "use command aliases and shortcuts"},
+        "ru": {
+            "label": "Aлиacы",
+            "desc": "иcпoльзoвaть aлиacы и coкpaщeния кoмaнд",
+        },
+        "commands": [],
+    },
 }
 
 # Flat map: command → category key (built once at import time)
@@ -127,6 +136,7 @@ _CATEGORY_ROWS = [
     ("terminal", "eval"),
     ("security", "system"),
     ("inline", "callback"),
+    ("aliases",),
 ]
 
 # Presets
@@ -265,20 +275,25 @@ def register(kernel):
         await kernel.db_set("trusted", "sgroups", json.dumps(groups))
 
     async def get_access(user_id: int) -> dict:
-        """Return per-user access dict. Defaults: all False."""
+        """Return per-user access dict. Defaults: all False, aliases True."""
         data = await kernel.db_get("trusted_access", str(user_id))
+        _defaults = dict.fromkeys(ACCESS_CATEGORIES, False)
+        _defaults["aliases"] = True  # backward compatibility
         if not data:
-            return dict.fromkeys(ACCESS_CATEGORIES, False)
+            return _defaults
         try:
             stored = (
                 json.loads(data) if isinstance(data, str) else json.loads(str(data))
             )
             if not isinstance(stored, dict):
-                return dict.fromkeys(ACCESS_CATEGORIES, False)
-            # Fill any missing keys with False
-            return {cat: stored.get(cat, False) for cat in ACCESS_CATEGORIES}
+                return _defaults
+            # Fill any missing keys with False; aliases defaults to True
+            return {
+                cat: stored.get(cat, True if cat == "aliases" else False)
+                for cat in ACCESS_CATEGORIES
+            }
         except Exception:
-            return dict.fromkeys(ACCESS_CATEGORIES, False)
+            return _defaults
 
     async def save_access(user_id: int, access: dict):
         await kernel.db_set("trusted_access", str(user_id), json.dumps(access))
@@ -1472,6 +1487,7 @@ def register(kernel):
 
         has_alias = False
         actual_cmd = cmd_token
+        resolved_cmd = actual_cmd
 
         if owner_alias and cmd_token.lower().endswith(owner_alias.lower()):
             stripped = cmd_token[: -len(owner_alias)]
@@ -1486,22 +1502,23 @@ def register(kernel):
             # Allow the owner/admin to bypass the alias/nonick requirement.
             # Owner messages in groups arrive as non-outgoing (out=False) so the
             # core message_handler skips them.  The trusted watcher is the fallback
-            # path — but without this exemption the owner too would need either the
+            # path - but without this exemption the owner too would need either the
             # @owner_username suffix or nonick membership to use short commands.
             admin_id = getattr(kernel, "ADMIN_ID", None)
             if sender_id != admin_id:
                 return
 
-        all_aliases = kernel.register.get_all_aliases()
-        resolved_cmd = _trusted_resolve_alias(kernel, actual_cmd)
-        if resolved_cmd in all_aliases:
-            resolved_cmd = all_aliases[resolved_cmd]
+        access = await get_access(sender_id)
+
+        if access.get("aliases", True):
+            all_aliases = kernel.register.get_all_aliases()
+            resolved_cmd = _trusted_resolve_alias(kernel, actual_cmd)
+            if resolved_cmd in all_aliases:
+                resolved_cmd = all_aliases[resolved_cmd]
 
         category = _get_command_category(resolved_cmd)
         if category == "unknown":
             return
-
-        access = await get_access(sender_id)
 
         cmd_access = await get_cmd_access(sender_id)
         user_has_access = False
@@ -1541,11 +1558,9 @@ def register(kernel):
         )
 
         class _MessageEventProxy:
-            def __init__(self, msg):
+            def __init__(self, msg, original_event=None):
                 self._msg = msg
-
-            def __getattr__(self, name):
-                return getattr(self._msg, name)
+                self._original_event = original_event
 
             @property
             def message(self):
@@ -1553,12 +1568,27 @@ def register(kernel):
 
             @property
             def is_reply(self):
+                if self._msg is None:
+                    return False
                 return bool(getattr(self._msg, "reply_to", None))
 
             @property
             def reply_to_msg_id(self):
+                if self._msg is None:
+                    return None
                 rt = getattr(self._msg, "reply_to", None)
                 return getattr(rt, "reply_to_msg_id", None) if rt else None
+
+            @property
+            def document(self):
+                if self._msg is None:
+                    return None
+                return getattr(self._msg, "document", None)
+
+            def __getattr__(self, name):
+                if self._msg is None:
+                    return None
+                return getattr(self._msg, name, None)
 
             async def edit(self, *args, **kwargs):
                 return await self._msg.edit(*args, **kwargs)
@@ -1567,12 +1597,23 @@ def register(kernel):
                 return await self._msg.reply(*args, **kwargs)
 
             async def get_reply_message(self):
+                if self._original_event is not None:
+                    return await self._original_event.get_reply_message()
                 return await self._msg.get_reply_message()
 
             def no_owner(self):
                 return True
 
-        await kernel.process_command(_MessageEventProxy(cmd))
+        try:
+            await kernel.process_command(_MessageEventProxy(cmd, original_event=event))
+        except Exception as e:
+            await kernel.handle_error(
+                e, source='Failed call "process_command"', event=cmd
+            )
+            raw_tb = "".join(
+                traceback.format_exception(type(e), e, e.__traceback__)
+            ).replace("Traceback (most recent call last):\n", "")
+            await cmd.edit(_strings["error"]("full_error", error=e, full_error=raw_tb))
 
     @kernel.register.loop(interval=30, autostart=True)
     async def update_callback_permissions(_kernel):

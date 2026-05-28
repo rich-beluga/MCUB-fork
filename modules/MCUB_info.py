@@ -140,7 +140,7 @@ class MCUBInfoMod(ModuleBase):
                 "{cpu_usage}, {ram_usage}, {system_user}, {hostname},\n"
                 "{update_needed}, {branch}, {commit_sha}, {commit_url},\n"
                 "{mcub_emoji}, {user_id}, {me_first_name}, {me_username},\n"
-                "{now_date}, {now_time}, {now_day}, {now_month},\n"
+                "{prefix}, {now_date}, {now_time}, {now_day}, {now_month},\n"
                 "{now_month_name}, {now_year}, {now_weekday},\n"
                 "{now_hour}, {now_minute}, {now_second}"
             ),
@@ -549,6 +549,7 @@ class MCUBInfoMod(ModuleBase):
                 data={
                     "kernel_version": self.kernel.VERSION,
                     "core_name": core_name,
+                    "prefix": self.kernel.custom_prefix,
                     "ping_time": ping_time,
                     "uptime_str": uptime_str,
                     "distro_name": distro_name,

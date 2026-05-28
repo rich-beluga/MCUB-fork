@@ -2,7 +2,7 @@
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
 """
-Tests for core/lib/loader/module_config — validators and config containers.
+Tests for core/lib/loader/module_config - validators and config containers.
 """
 
 import pytest
@@ -81,7 +81,7 @@ class TestBoolean:
 
 class TestInteger:
     def test_none_returns_none(self):
-        """Integer must accept None — covers userbot-backup on_load crash."""
+        """Integer must accept None - covers userbot-backup on_load crash."""
         iv = Integer(default=None)
         assert iv.validate(None) is None
 
