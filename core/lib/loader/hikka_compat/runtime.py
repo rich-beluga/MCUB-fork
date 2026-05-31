@@ -133,10 +133,25 @@ class _StringsShim:
 
         return out or None
 
-    def __getitem__(self, key: str):
+    def __getitem__(self, key: str) -> str:
         value = self._raw_value(key)
-        if value is not None:
+        if isinstance(value, str):
             return value
+        if isinstance(value, dict):
+            lang = (
+                getattr(self._translator, "_lang", "en") if self._translator else "en"
+            )
+            preferred = [lang]
+            if "-" in lang:
+                preferred.append(lang.split("-", 1)[0])
+            preferred.extend(["en", "ru"])
+            for candidate in preferred:
+                v = value.get(candidate)
+                if isinstance(v, str) and v:
+                    return v
+            for v in value.values():
+                if isinstance(v, str) and v:
+                    return v
         grouped = self._group_value(key)
         if grouped is not None:
             return grouped

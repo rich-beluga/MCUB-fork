@@ -393,12 +393,24 @@ class LogBot(ModuleBase):
 
             chat_id = None
             if hasattr(created, "updates") and created.updates:
-                for update in created.updates:
-                    if hasattr(update, "participants") and hasattr(
-                        update.participants, "chat_id"
-                    ):
-                        chat_id = update.participants.chat_id
-                        break
+                updates_list = (
+                    created.updates.updates
+                    if hasattr(created.updates, "updates")
+                    else created.updates
+                )
+                if hasattr(updates_list, "__iter__"):
+                    for update in updates_list:
+                        if hasattr(update, "participants") and hasattr(
+                            update.participants, "chat_id"
+                        ):
+                            chat_id = update.participants.chat_id
+                            break
+                if (
+                    not chat_id
+                    and hasattr(created.updates, "chats")
+                    and created.updates.chats
+                ):
+                    chat_id = created.updates.chats[0].id
             self.log.debug(f"chat_id:{chat_id}")
 
             if not chat_id and hasattr(created, "chats") and created.chats:
