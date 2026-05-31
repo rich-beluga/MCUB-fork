@@ -262,7 +262,6 @@ class LogBot(ModuleBase):
     )
     async def update_check_loop(self):
         if not self.kernel.log_chat_id:
-            self.kernel.logger.warning(self.lang["update_no_log"])
             return
 
         try:
