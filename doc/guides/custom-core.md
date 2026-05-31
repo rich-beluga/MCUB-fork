@@ -55,9 +55,9 @@ python3 -m core --set-default-core mycore
 
 ```python
 class Kernel(_StandardKernel):
-    async def handle_error(self, e, source="unknown", event=None):
-        await super().handle_error(e, source=source, event=event)
-        await my_monitoring.send(f"[{source}] {e}")
+    async def handle_error(self, e, source="unknown", message=None, event=None):
+        await super().handle_error(e, source=source, message=message, event=event)
+        await my_monitoring.send(f"[{message or source}] {e}")
 ```
 
 ## Core Naming Conventions
