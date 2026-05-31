@@ -82,7 +82,7 @@ class UserLoaderMixin:
             files.remove("log_bot.py")
             files.insert(0, "log_bot.py")
 
-        # Read every .py file **once**, cache code for phase 2.
+        # Read every .py file once, cache code for phase 2.
         modules_code: list[tuple[str, str]] = []
         code_cache: dict[str, str] = {}  # filename -> code
         for file_name in files:
