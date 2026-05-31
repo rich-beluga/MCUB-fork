@@ -243,7 +243,7 @@ class LogBot(ModuleBase):
                     )
                 except Exception as e:
                     await self.kernel.handle_error(
-                        e, source='Failed call "click"', event=_message_edit
+                        e, message='Failed call "click"', event=_message_edit
                     )
                     raw_tb = "".join(
                         traceback.format_exception(type(e), e, e.__traceback__)
