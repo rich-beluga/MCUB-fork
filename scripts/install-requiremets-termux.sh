@@ -5,11 +5,9 @@ file="$(pwd)/requirements-termux.txt"
 pkg='python-psutil'
 
 if ! command -v pip3 &> /dev/null; then
-    echo 'No install python-pip'
+    echo '— Error: pip3 not found'
     exit 1
 fi
-
-cmd="pip3 install -r $file > $tmpfile"
 
 spinner() {
     local pid=$1
@@ -17,7 +15,7 @@ spinner() {
         '[ ===>]' '[  ==>]' '[   =>]' '[    >]')
     local i=0
     while kill -0 $pid 2>/dev/null; do
-        printf "\r${frames[$((i++%${#frames[@]}))]} • Install requirements, please wait"
+        printf "\r%-60s" "${frames[$((i++%${#frames[@]}))]} • Install requirements, please wait"
         sleep 0.12
     done
     printf "\r\033[K"
@@ -49,12 +47,12 @@ run_cmd() {
 run_cmd "pip3 install --upgrade pip"
 run_cmd "pip3 install -r $file" || exit 1
 if ! command -v pkg &> /dev/null; then
-    echo '- Unknown command: pkg'
+    echo '- Unknown command: pkg, skipping'
 else
-    run_cmd "pkg install python-psutil" || exit 1
+    run_cmd "pkg install $pkg" || exit 1
 fi
 
 read -p "- Install cryptg? [N/y] • " answer
-if [[ $answer == "y" ]]; then
+if [[ ${answer,,} == "y" ]]; then
     run_cmd "pip3 install cryptg" || exit 1
 fi
