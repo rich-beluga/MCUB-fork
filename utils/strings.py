@@ -94,7 +94,11 @@ class StringsGroup:
     def __call__(self, key: str, **kwargs) -> Any:
         result = self._lookup(key)
         if kwargs and isinstance(result, str):
-            return result.format(**kwargs)
+            escaped = {
+                k: str(v).replace("{", "{{").replace("}", "}}")
+                for k, v in kwargs.items()
+            }
+            return result.format(**escaped)
         return result
 
     def get(self, key: str, default: Any = None) -> Any:
