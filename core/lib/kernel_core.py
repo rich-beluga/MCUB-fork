@@ -815,7 +815,11 @@ class KernelCoreMixin:
 
         # Track source if provided
         if result[0] and (source_url or source_repo):
-            self._module_sources[module_name] = {"url": source_url, "repo": source_repo}
+            self._module_sources[module_name] = {
+                "url": source_url,
+                "repo": source_repo,
+                "original_name": module_name,
+            }
             await self.save_module_sources()
 
         return result

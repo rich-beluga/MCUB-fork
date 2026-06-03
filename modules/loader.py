@@ -324,11 +324,12 @@ class Loader(ModuleBase):
         if source:
             url = source.get("url")
             repo = source.get("repo")
+            orig_name = source.get("original_name", module_name)
             if url:
                 return f'<blockquote><tg-emoji emoji-id="5411527152212411235">🔗</tg-emoji> Source link {url}</blockquote>'
             elif repo:
                 repo = repo.rstrip("/")
-                return f'<blockquote><tg-emoji emoji-id="5411527152212411235">🔗</tg-emoji> Source link {repo}/{module_name}.py</blockquote>'
+                return f'<blockquote><tg-emoji emoji-id="5411527152212411235">🔗</tg-emoji> Source link {repo}/{orig_name}.py</blockquote>'
         return ""
 
     async def _get_inline_bot_username(self) -> str | None:
@@ -1175,6 +1176,7 @@ class Loader(ModuleBase):
                     "type": "url" if is_url else "repo",
                     "url": module_or_url if is_url else None,
                     "repo": repo_url if not is_url and repo_url else None,
+                    "original_name": module_name,
                 }
 
                 class_instance = getattr(
