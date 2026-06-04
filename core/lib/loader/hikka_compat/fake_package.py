@@ -14,6 +14,7 @@ import re
 import sys
 import traceback
 import types
+import builtins
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -200,9 +201,14 @@ def _detect_module_type(source_code: str) -> str:
 
         elif isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name.startswith("core.lib.loader"):
+                if alias.name.startswith("core.lib.loader") or alias.name.startswith(
+                    "core.lib.module_base"
+                ):
                     native_score += 1
-                if alias.name == "core.lib.loader.module_base":
+                if alias.name in {
+                    "core.lib.loader.module_base",
+                    "core.lib.module_base",
+                }:
                     native_loader_aliases.add(_alias_name(alias))
 
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -274,6 +280,8 @@ def _detect_module_type(source_code: str) -> str:
             if chain[:3] == ["self", "inline", "_bot"]:
                 geek_score += 1
 
+    if hikka_score >= 1 and native_score >= 1:
+        return "suspicious"
     if hikka_score >= 1:
         return "hikka"
     if geek_score >= 1:
@@ -803,6 +811,8 @@ def _ensure_herokutl_stub() -> None:
         "ChatParticipantCreator",
     ):
         tl_types.__dict__[_name] = type(_name, (_Base,), {})
+
+    tl_types.InputMediaWebPage = InputMediaWebPage
 
     tl_custom_mod = types.ModuleType("herokutl.tl.custom")
     tl_custom_mod.__path__ = []
@@ -1774,9 +1784,51 @@ async def load_hikka_module(
 
     _MAX_DEP_RETRIES = 10
 
+    # Block dangerous modules - both via __import__ override AND
+    # sys.modules stub so attribute traversal can't reach the real module.
+    _DANGEROUS_MODULES = {
+        "telethon.client.protection",
+        "telethon.client.users",
+        "telethon.client.message",
+        "telethon.client.bot",
+    }
+
+    _BLOCKED_STUB = type(sys)("_blocked")
+
+    # Pre-stub in sys.modules so even after import telethon,
+    # telethon.client.protection resolves to the stub
+    for _mod_name in _DANGEROUS_MODULES:
+        sys.modules[_mod_name] = _BLOCKED_STUB
+
+    _real_import = builtins.__import__
+
+    def _hikka_import(name, *args, **kwargs):
+        if name in _DANGEROUS_MODULES or any(
+            name.startswith(m + ".") for m in _DANGEROUS_MODULES
+        ):
+            raise ImportError(f"Import '{name}' is blocked for module security")
+        # Also block accessing parent that leads to dangerous children
+        if name == "telethon":
+            mod = _real_import(name, *args, **kwargs)
+            for _dn in _DANGEROUS_MODULES:
+                _parts = _dn.split(".")
+                _target = mod
+                for _p in _parts[1:-1]:
+                    _target = getattr(_target, _p, None)
+                    if _target is None:
+                        break
+                if _target is not None:
+                    _last = _parts[-1]
+                    object.__setattr__(_target, _last, _BLOCKED_STUB)
+            return mod
+        return _real_import(name, *args, **kwargs)
+
+    ns = mod_obj.__dict__
+    ns["__builtins__"] = {**builtins.__dict__, "__import__": _hikka_import}
+
     for _attempt in range(_MAX_DEP_RETRIES):
         try:
-            exec(code, mod_obj.__dict__)
+            exec(code, ns)
             break
         except ModuleNotFoundError as e:
             missing_pkg = e.name.split(".")[0] if e.name else None
@@ -1827,6 +1879,7 @@ async def load_hikka_module(
                 "tgcalls",
                 "aexec",
                 "pytgcalls",
+                "core",
             }
             if missing_pkg.lower() in _SYSTEM_PACKAGES:
                 kernel.logger.warning(

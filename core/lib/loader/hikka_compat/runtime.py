@@ -2367,14 +2367,16 @@ def _get_members(
 
 class _AllModulesStub:
     def __init__(self, kernel):
+        from ..kernel_proxy import ClientProxy
+
         self._kernel = kernel
         self.db = getattr(kernel, "_hikka_compat_db_facade", None)
         if self.db is None:
             self.db = _KernelDbFacade(kernel)
             kernel._hikka_compat_db_facade = self.db
-        self.client = kernel.client
+        self.client = ClientProxy(kernel.client, module_name="allmodules")
         self.inline = None
-        self.allclients = [kernel.client]
+        self.allclients = [self.client]
         self.translator = getattr(kernel, "_hikka_compat_translator", None)
         if self.translator is None:
             self.translator = _CompatTranslatorFacade()
@@ -2658,9 +2660,9 @@ class Module:
         pass
 
     def _mcub_bind(self, kernel, module_type: str = "native") -> None:
-        from .client import FakeClient
+        from ..kernel_proxy import ClientProxy
 
-        self._kernel = kernel
+        self.__kernel = kernel  # name-mangled → subclass can't reach it
         self._module_type = module_type
 
         if not hasattr(kernel, "_hikka_compat_inline_proxy"):
@@ -2671,22 +2673,19 @@ class Module:
 
         inline_proxy._bind_module(self)
 
-        is_hikka = module_type == "hikka"
-        self.client = FakeClient(kernel.client, inline_proxy, is_hikka=is_hikka)
+        self.client = ClientProxy(kernel.client, module_name=type(self).__name__)
         self._client = self.client
 
-        if getattr(self._client._client, "dispatcher", None) is None:
-            self._client._client.dispatcher = types.SimpleNamespace()
-        if getattr(self._client._client.dispatcher, "security", None) is None:
-            self._client._client.dispatcher.security = _CompatSecurityManager(
-                self._client
-            )
+        if getattr(kernel.client, "dispatcher", None) is None:
+            kernel.client.dispatcher = types.SimpleNamespace()
+        if getattr(kernel.client.dispatcher, "security", None) is None:
+            kernel.client.dispatcher.security = _CompatSecurityManager(self.client)
         _raw_strings = type(self).__dict__.get("strings", {"name": type(self).__name__})
         self._db_owner = _raw_strings.get("name") or type(self).__name__
         self.name = _raw_strings.get("name", self._db_owner)
         self.db = DbProxy(kernel, self._db_owner)
         self._db = self.db
-        self.inline = self.client._inline_proxy
+        self.inline = inline_proxy
         self.tg_id = getattr(kernel, "ADMIN_ID", None)
         self._tg_id = self.tg_id
         self.allmodules = _AllModulesStub(kernel)

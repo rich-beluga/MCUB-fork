@@ -137,6 +137,10 @@ class InlineManager:
     def _list_session_key(list_uuid: str) -> str:
         return f"list:{list_uuid}"
 
+    @staticmethod
+    def _text_session_key(text_uuid: str) -> str:
+        return f"text:{text_uuid}"
+
     def _nav_buttons(
         self, kind: str, uid: str, *, ttl: int = 900, page: int = 0, total: int = 1
     ) -> list[list[Any]]:
@@ -146,6 +150,8 @@ class InlineManager:
                 handler = self._gallery_nav_cb
             case "list":
                 handler = self._list_nav_cb
+            case "text":
+                handler = self._text_nav_cb
         if handler is None:
             return []
 
@@ -231,6 +237,52 @@ class InlineManager:
         lines.append("</blockquote>")
         lines.append(f"<blockquote>📄 {page + 1}/{total_pages}</blockquote>")
         return "\n".join(lines), page, total_pages
+
+    def _render_text_page(
+        self,
+        full_text: str,
+        page: int,
+        chars_per_page: int,
+    ) -> tuple[str, int, int]:
+        """Split *full_text* into pages, strip tags, escape, wrap in ``<blockquote expandable>``.
+
+        Returns:
+            (safe_block, current_page, total_pages)
+        """
+        from html import escape as html_escape
+        import re
+
+        chars_per_page = max(int(chars_per_page), 1)
+
+        if not full_text:
+            return "", 0, 1
+
+        lines = full_text.split("\n")
+        pages: list[str] = []
+        cur: list[str] = []
+        cur_len = 0
+        for line in lines:
+            add = len(line) + (1 if cur else 0)
+            if cur and cur_len + add > chars_per_page:
+                pages.append("\n".join(cur))
+                cur = [line]
+                cur_len = len(line)
+            else:
+                cur.append(line)
+                cur_len += add
+        if cur:
+            pages.append("\n".join(cur))
+
+        total_pages = len(pages)
+        page = max(0, min(int(page), total_pages - 1))
+
+        clean = html_escape(re.sub(r"<[^>]*>", "", pages[page]))
+
+        return (
+            f"<blockquote expandable>{clean}</blockquote>",
+            page,
+            total_pages,
+        )
 
     async def _gallery_nav_cb(self, event, gallery_uuid: str, action: str):
         k = self.k
@@ -349,6 +401,57 @@ class InlineManager:
             await event.answer()
         except Exception as e:
             k.logger.error(f"list nav error: {e}")
+            await event.answer(f"❌ Error: {e}", alert=True)
+
+    async def _text_nav_cb(self, event, text_uuid: str, action: str):
+        k = self.k
+        session_key = self._text_session_key(text_uuid)
+        text_data = self._session_get(session_key)
+        if not text_data:
+            await event.answer("❌ Session expired", alert=True)
+            return
+
+        full_text = text_data.get("text", "")
+        page = int(text_data.get("page", 0) or 0)
+        chars_per_page = int(text_data.get("chars_per_page", 1000) or 1000)
+
+        total_pages = max((len(full_text) + chars_per_page - 1) // chars_per_page, 1)
+
+        match action:
+            case "prev":
+                page = (page - 1) % total_pages
+            case "next":
+                page = (page + 1) % total_pages
+            case "first":
+                page = 0
+            case "last":
+                page = total_pages - 1
+            case "refresh":
+                page = page % total_pages
+            case "close":
+                try:
+                    await event.delete()
+                except Exception:
+                    pass
+                self._sessions.pop(session_key, None)
+                return
+            case _:
+                page = 0
+
+        page_text, page, _tp = self._render_text_page(full_text, page, chars_per_page)
+        text_data["page"] = page
+        session = self._sessions.get(session_key)
+        if session:
+            self._sessions[session_key] = _Session(
+                expires_at=session.expires_at, data=text_data
+            )
+
+        nav_buttons = self._nav_buttons("text", text_uuid, page=page, total=total_pages)
+        try:
+            await event.edit(page_text, buttons=nav_buttons, parse_mode="html")
+            await event.answer()
+        except Exception as e:
+            k.logger.error(f"text nav error: {e}")
             await event.answer(f"❌ Error: {e}", alert=True)
 
     def _setup_temp_callback_handler(self) -> None:
@@ -910,6 +1013,65 @@ class InlineManager:
         except Exception as e:
             k.logger.error(f"list error: {e}")
             await k.handle_error(e, message="Inline list error")
+            return (False, None)
+
+    async def text(
+        self,
+        chat_id: int,
+        text: str,
+        *,
+        chars_per_page: int = 1000,
+        ttl: int = 200,
+        **kwargs,
+    ):
+        """Send long text split into pages with navigation.
+
+        Args:
+            chat_id: Target chat.
+            text: The full text to split into pages.
+            chars_per_page: Max characters per page (default 1000).
+            ttl: Cache TTL for navigation data (seconds).
+
+        Returns:
+            (success, message) tuple.
+        """
+        k = self.k
+
+        if not text:
+            return False, None
+
+        try:
+            text_uuid = str(uuid.uuid4())[:8]
+            session_key = self._text_session_key(text_uuid)
+            self._session_put(
+                session_key,
+                {
+                    "text": text,
+                    "chars_per_page": chars_per_page,
+                    "page": 0,
+                },
+                ttl=ttl,
+            )
+
+            page_text, _page, total_pages = self._render_text_page(
+                text, page=0, chars_per_page=chars_per_page
+            )
+            nav_buttons = self._nav_buttons(
+                "text", text_uuid, page=0, total=total_pages
+            )
+
+            return await self.inline_form(
+                chat_id=chat_id,
+                title=page_text,
+                fields=None,
+                buttons=nav_buttons,
+                auto_send=True,
+                ttl=ttl,
+                **kwargs,
+            )
+        except Exception as e:
+            k.logger.error(f"text pager error: {e}")
+            await k.handle_error(e, message="Inline text pager error")
             return (False, None)
 
     def get_module_inline_commands(self, module_name: str) -> list:

@@ -174,6 +174,10 @@ class KernelLifecycleMixin:
         async def message_handler(event):
             msg = getattr(event, "message", event)
 
+            is_bot = getattr(msg, "via_bot", None)
+            if is_bot is not None:
+                return
+
             if not self.should_process_command_event(event):
                 self.logger.debug(
                     "[core_handlers] skip-nonoutgoing handler=message_handler "
@@ -230,6 +234,11 @@ class KernelLifecycleMixin:
 
         async def fallback_message_handler(event):
             msg = getattr(event, "message", event)
+
+            is_bot = getattr(msg, "via_bot", None)
+            if is_bot is not None:
+                return
+
             if not self.should_process_command_event(event):
                 return
             if self._is_command_event_processed(event):
@@ -243,6 +252,10 @@ class KernelLifecycleMixin:
                 getattr(msg, "out", False),
                 self.is_admin(getattr(event, "sender_id", None)),
             )
+            is_bot = getattr(msg, "via_bot", None)
+            if is_bot is not None:
+                return
+
             self._mark_command_event_processed(event)
             await self.process_command(event)
 

@@ -748,15 +748,20 @@ class KernelLogger:
         buttons: list[Button] = []
 
         if error_id:
-            buttons.append(Button.inline("🔍 Traceback", data=f"show_tb:{error_id}"))
+            buttons.append(
+                Button.inline(
+                    "Traceback", data=f"show_tb:{error_id}", icon=5370872220149099318
+                )
+            )
 
         if source_func and error_id:
             count = self._track_similar(source_func, error_id)
             if count > 1:
                 buttons.append(
                     Button.inline(
-                        f"📋 Similar ({count})",
+                        f"Similar ({count})",
                         data=f"find_similar:{_sig_hash(source_func)}",
+                        icon=5267028002650204185,
                     )
                 )
 
@@ -764,7 +769,9 @@ class KernelLogger:
             short_source = source[:50] if len(source) > 50 else source
             buttons.append(
                 Button.inline(
-                    "🔕 Mute 1h", data=f"mute_err:{error_type}:{short_source}"
+                    "Mute 1h",
+                    data=f"mute_err:{error_type}:{short_source}",
+                    icon=5451959871257713464,
                 )
             )
 

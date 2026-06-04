@@ -65,7 +65,7 @@ if TYPE_CHECKING:
 try:
     _STDLIB_MODULES: frozenset[str] = sys.stdlib_module_names  # Python ≥3.10
 except AttributeError:
-    # Fallback for older Python — define known subset
+    # Fallback for older Python - define known subset
     _STDLIB_MODULES = frozenset()
 
 # Additional names frequently used as local modules/packages that would
@@ -120,13 +120,13 @@ class ModuleLoaderMixin:
         """Return a human-readable conflict reason if *module_name* is forbidden, else ``None``."""
         if module_name in FORBIDDEN_MODULE_NAMES:
             return (
-                f"Module name '{module_name}' is reserved — it shadows a Python "
+                f"Module name '{module_name}' is reserved - it shadows a Python "
                 f"stdlib or core library import ({module_name!r}). "
                 f"Rename your module file."
             )
         if module_name.startswith("_") or module_name.startswith("."):
             return (
-                f"Module name '{module_name}' starts with '_' or '.' — "
+                f"Module name '{module_name}' starts with '_' or '.' - "
                 f"these prefixes are reserved."
             )
         return None
@@ -162,7 +162,7 @@ class ModuleLoaderMixin:
             )
 
         k.logger.error(
-            "[loader] FORBIDDEN module name %r (%s) — %s",
+            "[loader] FORBIDDEN module name %r (%s) - %s",
             module_name,
             "system" if is_system else "user",
             reason,
@@ -705,6 +705,12 @@ class ModuleLoaderMixin:
                 )
 
                 module_type = _detect_module_type(code)
+                if module_type == "suspicious":
+                    return (
+                        False,
+                        "Module blocked: dual-platform pattern detected "
+                        "(hikka + native register). This looks like malware.",
+                    )
                 if module_type in ("hikka", "geek"):
                     import os as _os
 

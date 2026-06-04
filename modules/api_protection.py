@@ -41,6 +41,8 @@ DEFAULT_CONFIG = {
     "mcub_mode": "safe",
     "mcub_dry_run": False,
     "mcub_allowlist": [],
+    # lockdown - blocks profile edits, chat creation, etc.
+    "mcub_lockdown": False,
     # analytics
     "enable_analytics": True,
     "zscore_threshold": 3.0,
@@ -483,6 +485,12 @@ def register(kernel):
             validator=ListValidator(default=[], item_type=str),
         ),
         ConfigValue(
+            "mcub_lockdown",
+            False,
+            description="Lockdown mode - blocks profile edits, chat creation, etc.",
+            validator=Boolean(default=False),
+        ),
+        ConfigValue(
             "enable_analytics",
             True,
             description="Enable analytics",
@@ -568,6 +576,20 @@ def register(kernel):
             await kernel.save_module_config(__name__, config_dict_clean)
         kernel.store_module_config_schema(__name__, config)
 
+        # Apply MCUB protection mode now that config is loaded from DB
+        if _mcub_available:
+            mode = config.get("mcub_mode", "safe")
+            if _apply_mcub_mode(mode):
+                try:
+                    client.clear_blocked_request_handler()
+                except Exception:
+                    pass
+                client.on_blocked_request(_mcub_violation_handler)
+                kernel.logger.info(
+                    f"MCUB protection mode set to '{mode}' "
+                    f"(lockdown={config.get('mcub_lockdown', False)})"
+                )
+
     asyncio.create_task(startup())
 
     def persist_api_config():
@@ -607,14 +629,171 @@ def register(kernel):
 
         try:
             if mode == "custom":
-                # Build a ProtectionPolicy from config allowlist + dry_run flag
-                from telethon.client.protection import ProtectionPolicy
-
-                allowlist = set(
-                    _coerce_method_list(api_config.get("mcub_allowlist", []))
+                from telethon.client.protection import (
+                    ProtectionPolicy,
+                    STRICT_DANGEROUS_REQUESTS,
+                    build_protection_policy,
                 )
+
+                lockdown = api_config.get("mcub_lockdown", False)
                 dry_run = api_config.get("mcub_dry_run", False)
-                policy = ProtectionPolicy(allowlist=allowlist, dry_run=dry_run)
+
+                if lockdown:
+                    from telethon.tl.functions.account import (
+                        UpdateProfileRequest,
+                        UpdateUsernameRequest,
+                        UpdateStatusRequest,
+                        UpdateColorRequest,
+                        UpdateEmojiStatusRequest,
+                        UpdateBirthdayRequest,
+                        UpdatePersonalChannelRequest,
+                        DeleteSecureValueRequest,
+                        ResetNotifySettingsRequest,
+                        SaveWallPaperRequest,
+                    )
+                    from telethon.tl.functions.messages import (
+                        CreateChatRequest,
+                        AddChatUserRequest,
+                        DeleteChatRequest,
+                        EditChatAboutRequest,
+                        ImportChatInviteRequest,
+                        ClearAllDraftsRequest,
+                        DeleteHistoryRequest,
+                        DeleteMessagesRequest,
+                        DeleteScheduledMessagesRequest,
+                        SaveDraftRequest,
+                        UpdateDialogFilterRequest,
+                    )
+                    from telethon.tl.functions.channels import (
+                        CreateChannelRequest,
+                        InviteToChannelRequest,
+                        EditAdminRequest,
+                        EditBannedRequest,
+                        EditTitleRequest,
+                        EditPhotoRequest,
+                        EditCreatorRequest,
+                        ToggleAntiSpamRequest,
+                        DeleteChannelRequest,
+                        JoinChannelRequest,
+                        LeaveChannelRequest,
+                    )
+                    from telethon.tl.functions.contacts import (
+                        DeleteContactsRequest,
+                        UnblockRequest,
+                    )
+                    from telethon.tl.functions.photos import (
+                        UpdateProfilePhotoRequest as PhotosUpdateProfilePhotoRequest,
+                        UploadProfilePhotoRequest,
+                        DeletePhotosRequest,
+                    )
+                    from telethon.tl.functions.stories import (
+                        DeleteStoriesRequest,
+                    )
+
+                    extra_blocked = (
+                        UpdateProfileRequest,
+                        UpdateUsernameRequest,
+                        UpdateStatusRequest,
+                        UpdateColorRequest,
+                        UpdateEmojiStatusRequest,
+                        UpdateBirthdayRequest,
+                        UpdatePersonalChannelRequest,
+                        DeleteSecureValueRequest,
+                        ResetNotifySettingsRequest,
+                        SaveWallPaperRequest,
+                        CreateChatRequest,
+                        AddChatUserRequest,
+                        DeleteChatRequest,
+                        EditChatAboutRequest,
+                        ImportChatInviteRequest,
+                        ClearAllDraftsRequest,
+                        DeleteHistoryRequest,
+                        DeleteMessagesRequest,
+                        DeleteScheduledMessagesRequest,
+                        SaveDraftRequest,
+                        UpdateDialogFilterRequest,
+                        CreateChannelRequest,
+                        InviteToChannelRequest,
+                        EditAdminRequest,
+                        EditBannedRequest,
+                        EditTitleRequest,
+                        EditPhotoRequest,
+                        EditCreatorRequest,
+                        ToggleAntiSpamRequest,
+                        DeleteChannelRequest,
+                        JoinChannelRequest,
+                        LeaveChannelRequest,
+                        DeleteContactsRequest,
+                        UnblockRequest,
+                        PhotosUpdateProfilePhotoRequest,
+                        UploadProfilePhotoRequest,
+                        DeletePhotosRequest,
+                        DeleteStoriesRequest,
+                    )
+                    from telethon.tl.functions.messages import (
+                        CreateChatRequest,
+                        AddChatUserRequest,
+                        DeleteChatRequest,
+                        EditChatAboutRequest,
+                        ImportChatInviteRequest,
+                    )
+                    from telethon.tl.functions.channels import (
+                        CreateChannelRequest,
+                        InviteToChannelRequest,
+                        EditAdminRequest,
+                        EditBannedRequest,
+                        EditTitleRequest,
+                        EditPhotoRequest,
+                        EditCreatorRequest,
+                        ToggleAntiSpamRequest,
+                        DeleteChannelRequest,
+                        JoinChannelRequest,
+                    )
+                    from telethon.tl.functions.photos import (
+                        UpdateProfilePhotoRequest as PhotosUpdateProfilePhotoRequest,
+                        UploadProfilePhotoRequest,
+                        DeletePhotosRequest,
+                    )
+
+                    extra_blocked = (
+                        UpdateProfileRequest,
+                        UpdateUsernameRequest,
+                        UpdateStatusRequest,
+                        UpdateColorRequest,
+                        UpdateEmojiStatusRequest,
+                        UpdateBirthdayRequest,
+                        UpdatePersonalChannelRequest,
+                        CreateChatRequest,
+                        AddChatUserRequest,
+                        DeleteChatRequest,
+                        CreateChannelRequest,
+                        InviteToChannelRequest,
+                        EditAdminRequest,
+                        EditBannedRequest,
+                        EditTitleRequest,
+                        EditPhotoRequest,
+                        EditChatAboutRequest,
+                        EditCreatorRequest,
+                        ToggleAntiSpamRequest,
+                        DeleteChannelRequest,
+                        PhotosUpdateProfilePhotoRequest,
+                        UploadProfilePhotoRequest,
+                        DeletePhotosRequest,
+                    )
+                    policy = build_protection_policy(
+                        "custom",
+                        blocked_requests=STRICT_DANGEROUS_REQUESTS + extra_blocked,
+                        dry_run=dry_run,
+                    )
+                else:
+                    allowlist = set(
+                        _coerce_method_list(api_config.get("mcub_allowlist", []))
+                    )
+                    policy = build_protection_policy(
+                        "custom",
+                        allowed_requests=tuple(allowlist) if allowlist else None,
+                        dry_run=dry_run,
+                    )
                 client.set_protection_policy(policy)
             else:
                 client.set_protection_mode(mode)
@@ -773,15 +952,7 @@ def register(kernel):
         client._call = api_call_interceptor
         client._original_call = original_call
 
-        # Apply MCUB protection mode on startup
-        if _mcub_available:
-            mode = api_config.get("mcub_mode", "safe")
-            if _apply_mcub_mode(mode):
-                client.on_blocked_request(_mcub_violation_handler)
-                kernel.logger.info(f"MCUB protection mode set to '{mode}'")
-            else:
-                kernel.logger.warning("MCUB mode apply failed on load")
-        else:
+        if not _mcub_available:
             kernel.logger.debug(
                 "Telethon-MCUB not detected, skipping native protection setup"
             )
@@ -984,6 +1155,33 @@ def register(kernel):
         seconds = int(args[1])
         blocked_until = time.time() + seconds
         await event.edit(lang["api_suspend"].format(seconds=seconds), parse_mode="html")
+
+    @kernel.register.command(
+        "lockdown",
+        doc_en="toggle ultra-strict lockdown (blocks profile edits, chat creation, etc.)",
+        doc_ru="вкл/выкл жёcткyю блoкиpoвкy (peдaктиpoвaниe пpoфиля, coздaниe чaтoв и т.д.)",
+    )
+    async def lockdown_handler(event):
+        nonlocal protection_enabled
+        cfg = api_config
+        new_val = not cfg.get("mcub_lockdown", False)
+        cfg["mcub_lockdown"] = new_val
+        cfg["mcub_mode"] = "custom"
+        protection_enabled = True
+        _apply_mcub_mode("custom")
+        try:
+            client.clear_blocked_request_handler()
+        except Exception:
+            pass
+        client.on_blocked_request(_mcub_violation_handler)
+        persist_api_config()
+
+        ok_emoji = '<tg-emoji emoji-id="5368585403467048206">🪬</tg-emoji>'
+        if new_val:
+            text = f"{ok_emoji} Lockdown enabled"
+        else:
+            text = f"{ok_emoji} Lockdown disabled"
+        await event.edit(text, parse_mode="html")
 
     async def api_protection_callback_handler(event):
         nonlocal protection_enabled

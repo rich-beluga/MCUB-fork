@@ -65,7 +65,7 @@ class ModuleDetectorMixin:
         try:
             import pathlib
 
-            pathlib.Path(self._persistent_cache_path).parent.mkdir(
+            pathlib.Path(self._persistent_cache_path).parents.mkdir(
                 parent=True, exist_ok=True
             )
             with open(self._persistent_cache_path, "w", encoding="utf-8") as f:

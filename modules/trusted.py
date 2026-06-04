@@ -1549,67 +1549,17 @@ def register(kernel):
         if actual_cmd not in kernel.command_handlers:
             return
 
-        cmd_text = owner_prefix + actual_cmd
-        if rest:
-            cmd_text += " " + " ".join(rest)
-
-        cmd = await kernel.client.send_message(
-            event.chat_id, cmd_text, reply_to=event.reply_to_msg_id
-        )
-
-        class _MessageEventProxy:
-            def __init__(self, msg, original_event=None):
-                self._msg = msg
-                self._original_event = original_event
-
-            @property
-            def message(self):
-                return self._msg
-
-            @property
-            def is_reply(self):
-                if self._msg is None:
-                    return False
-                return bool(getattr(self._msg, "reply_to", None))
-
-            @property
-            def reply_to_msg_id(self):
-                if self._msg is None:
-                    return None
-                rt = getattr(self._msg, "reply_to", None)
-                return getattr(rt, "reply_to_msg_id", None) if rt else None
-
-            @property
-            def document(self):
-                if self._msg is None:
-                    return None
-                return getattr(self._msg, "document", None)
-
-            def __getattr__(self, name):
-                if self._msg is None:
-                    return None
-                return getattr(self._msg, name, None)
-
-            async def edit(self, *args, **kwargs):
-                return await self._msg.edit(*args, **kwargs)
-
-            async def reply(self, *args, **kwargs):
-                return await self._msg.reply(*args, **kwargs)
-
-            async def get_reply_message(self):
-                if self._original_event is not None:
-                    return await self._original_event.get_reply_message()
-                return await self._msg.get_reply_message()
-
-            def no_owner(self):
-                return True
-
         try:
-            await kernel.process_command(_MessageEventProxy(cmd, original_event=event))
-        except Exception as e:
-            await kernel.handle_error(
-                e, source='Failed call "process_command"', event=cmd
+            cmd = await kernel.register.invoke(
+                actual_cmd,
+                args=" ".join(rest) if rest else None,
+                chat_id=event.chat_id,
+                reply_to=event.reply_to_msg_id,
+                prefix=owner_prefix,
+                original_event=event,
             )
+        except Exception as e:
+            await kernel.handle_error(e, source='Failed call "invoke"', event=cmd)
             raw_tb = "".join(
                 traceback.format_exception(type(e), e, e.__traceback__)
             ).replace("Traceback (most recent call last):\n", "")

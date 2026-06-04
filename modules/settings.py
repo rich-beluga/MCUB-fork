@@ -15,6 +15,7 @@ from core.lib.loader.module_base import ModuleBase, callback, command
 from core.lib.loader.module_config import Boolean, ConfigValue, ModuleConfig
 from utils.strings import get_available_locales
 from utils.strings import Strings
+from utils import answer
 
 
 class SettingsModule(ModuleBase):
@@ -298,10 +299,11 @@ class SettingsModule(ModuleBase):
             )
 
         text_html = "\n".join(lines_html)
-        await self.edit(
+        await answer(
             event,
             f"<blockquote expandable>{text_html}</blockquote>",
-            parse_mode="html",
+            as_html=True,
+            kernel=self.kernel,
         )
 
     @command(

@@ -371,6 +371,17 @@ class ModuleBase(ABC):
             event, text, reply_markup=reply_markup, as_html=as_html, **kwargs
         )
 
+    async def invoke(
+        self,
+        command: str,
+        args: str | None = None,
+        chat_id: int | None = None,
+        reply_to: int | None = None,
+    ) -> None:
+        return await self._register.invoke(
+            command, args=args, chat_id=chat_id, reply_to=reply_to
+        )
+
     async def inline(
         self,
         chat_id: int | Any,

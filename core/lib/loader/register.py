@@ -1488,3 +1488,128 @@ class Register:
                 f"[register.cleanup_inline_temp] removed={removed}"
             )
         return removed
+
+    async def invoke(
+        self,
+        command: str,
+        args: str | None = None,
+        chat_id: int | None = None,
+        reply_to: int | None = None,
+        *,
+        prefix: str | None = None,
+        original_event: Any = None,
+    ) -> Any:
+        """Execute a registered command in a specified chat.
+
+        Sends a prefixed command message to the target chat and dispatches it
+        through ``kernel.process_command()`` so aliases, middleware, and
+        pipeline processing are applied as normal.
+
+        Args:
+            command:  Command name (without prefix), e.g. ``"ping"``.
+            args:     Optional space-separated arguments appended to the
+                      command text.
+            chat_id:  Target chat ID. If ``None``, uses an arbitrary safe
+                      chat (e.g. the kernel's own saved peer).
+            reply_to: Optional message ID to reply to.
+            prefix:   Optional override for the default ``custom_prefix``.
+            original_event:
+                      Optional original event passed through to the proxy's
+                      ``get_reply_message()`` fallback.
+
+        Returns:
+            The sent :class:`telethon.tl.custom.Message` instance (usable
+            for manual error handling).
+
+        Example:
+            >>> await kernel.register.invoke("ping", chat_id=-1001234567890)
+            >>> await kernel.register.invoke(
+            ...     "eval", args="print(1+1)", chat_id=event.chat_id
+            ... )
+        """
+        if prefix is None:
+            prefix = getattr(self.kernel, "custom_prefix", ".")
+        cmd_text = f"{prefix}{command}"
+        if args:
+            cmd_text = f"{cmd_text} {args}"
+
+        if chat_id is None:
+            chat_id = (
+                getattr(self.kernel, "ADMIN_ID", None)
+                or (await self.kernel.client.get_me()).id
+            )
+
+        sent = await self.kernel.client.send_message(
+            chat_id, cmd_text, reply_to=reply_to
+        )
+
+        proxy = _MessageEventProxy(sent, original_event=original_event)
+        await self.kernel.process_command(proxy)
+        return sent
+
+    def message_proxy(
+        self,
+        msg: Any,
+        original_event: Any = None,
+    ) -> "_MessageEventProxy":
+        """Wrap a raw Telegram ``Message`` as an event-like proxy.
+
+        The returned object quacks like a userbot event and can be fed to
+        ``kernel.process_command()``.  Handy when you want to invoke a
+        command handler with a message you constructed yourself.
+        """
+        return _MessageEventProxy(msg, original_event=original_event)
+
+
+class _MessageEventProxy:
+    """Wrap a raw Telegram message so it quacks like a userbot event.
+
+    Used internally by :meth:`Register.invoke` to feed a self-sent message
+    through ``kernel.process_command()``.
+    """
+
+    def __init__(self, msg, original_event=None):
+        self._msg = msg
+        self._original_event = original_event
+
+    @property
+    def message(self):
+        return self._msg
+
+    @property
+    def is_reply(self):
+        if self._msg is None:
+            return False
+        return bool(getattr(self._msg, "reply_to", None))
+
+    @property
+    def reply_to_msg_id(self):
+        if self._msg is None:
+            return None
+        rt = getattr(self._msg, "reply_to", None)
+        return getattr(rt, "reply_to_msg_id", None) if rt else None
+
+    @property
+    def document(self):
+        if self._msg is None:
+            return None
+        return getattr(self._msg, "document", None)
+
+    def __getattr__(self, name):
+        if self._msg is None:
+            return None
+        return getattr(self._msg, name, None)
+
+    async def edit(self, *args, **kwargs):
+        return await self._msg.edit(*args, **kwargs)
+
+    async def reply(self, *args, **kwargs):
+        return await self._msg.reply(*args, **kwargs)
+
+    async def get_reply_message(self):
+        if self._original_event is not None:
+            return await self._original_event.get_reply_message()
+        return await self._msg.get_reply_message()
+
+    def no_owner(self):
+        return True
