@@ -2662,7 +2662,7 @@ class Module:
     def _mcub_bind(self, kernel, module_type: str = "native") -> None:
         from ..kernel_proxy import ClientProxy
 
-        self.__kernel = kernel  # name-mangled → subclass can't reach it
+        self._kernel = kernel
         self._module_type = module_type
 
         if not hasattr(kernel, "_hikka_compat_inline_proxy"):

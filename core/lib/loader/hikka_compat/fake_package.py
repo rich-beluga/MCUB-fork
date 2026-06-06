@@ -1796,9 +1796,20 @@ async def load_hikka_module(
     _BLOCKED_STUB = type(sys)("_blocked")
 
     # Pre-stub in sys.modules so even after import telethon,
-    # telethon.client.protection resolves to the stub
+    # telethon.client.protection resolves to the stub.
+    # Save originals so we can restore after module exec.
+    _saved_dangerous_modules = {}
     for _mod_name in _DANGEROUS_MODULES:
+        _saved_dangerous_modules[_mod_name] = sys.modules.get(_mod_name)
         sys.modules[_mod_name] = _BLOCKED_STUB
+
+    def _restore_dangerous_modules():
+        for _mod_name in _DANGEROUS_MODULES:
+            _saved = _saved_dangerous_modules.get(_mod_name)
+            if _saved is not None:
+                sys.modules[_mod_name] = _saved
+            else:
+                sys.modules.pop(_mod_name, None)
 
     _real_import = builtins.__import__
 
@@ -1829,6 +1840,7 @@ async def load_hikka_module(
     for _attempt in range(_MAX_DEP_RETRIES):
         try:
             exec(code, ns)
+            _restore_dangerous_modules()
             break
         except ModuleNotFoundError as e:
             missing_pkg = e.name.split(".")[0] if e.name else None
