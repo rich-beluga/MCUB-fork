@@ -150,6 +150,37 @@ class ClientManager:
         platform = PlatformDetector()
         detected_platform = platform.detect()
         proxy_enabled = bool(k.config.get("proxy"))
+        if proxy_enabled:
+            proxy = k.config["proxy"]
+            if isinstance(proxy, dict):
+                required_keys = {"proxy_type", "addr", "port"}
+                missing = required_keys - set(proxy.keys())
+                if missing:
+                    k.logger.error(
+                        "Proxy config missing required keys: %s. "
+                        "Expected: proxy_type, addr, port. "
+                        "Proxy will be ignored.",
+                        missing,
+                    )
+                    proxy = None
+                else:
+                    known_types = {"socks5", "socks4", "http", 1, 2, 3}
+                    if proxy.get("proxy_type") not in known_types:
+                        k.logger.error(
+                            "Unknown proxy_type=%r. Expected one of: %s. "
+                            "Proxy will be ignored.",
+                            proxy.get("proxy_type"),
+                            "socks5, socks4, http",
+                        )
+                        proxy = None
+            elif not isinstance(proxy, (tuple, list)):
+                k.logger.error(
+                    "Proxy config must be a dict or tuple, got %s. Proxy will be ignored.",
+                    type(proxy).__name__,
+                )
+                proxy = None
+        else:
+            proxy = None
         k.logger.info(
             f"Initializing MCUB on {get_platform_name()} "
             f"(Python {sys.version_info.major}.{sys.version_info.minor})..."
@@ -173,7 +204,7 @@ class ClientManager:
             SQLiteSession(session_path),
             k.API_ID,
             k.API_HASH,
-            proxy=k.config.get("proxy"),
+            proxy=proxy,
             connection_retries=999999,
             request_retries=3,
             flood_sleep_threshold=30,
