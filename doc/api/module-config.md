@@ -50,10 +50,70 @@ The recommended way to create module configuration. Provides:
 | `Emoji(default=..., min_count=1, max_count=None)` | Valid emoji or emoji sequence |
 | `EntityLike(default=...)` | Telegram entity-like value: ID, `@username`, `t.me` link or URL |
 
-### Usage
+### Usage (Class-Style — Recommended)
 
 ```python
-from core.lib.loader.module_config import ModuleConfig, ConfigValue, Boolean, String, Choice, Link, Union, Integer, Float
+from __future__ import annotations
+
+from core.lib.loader.module_base import ModuleBase
+from core.lib.loader.module_config import (
+    Boolean,
+    Choice,
+    ConfigValue,
+    Integer,
+    ModuleConfig,
+    String,
+)
+
+
+class MyModule(ModuleBase):
+    name = "MyModule"
+    version = "1.0.0"
+
+    config = ModuleConfig(
+        ConfigValue(
+            "enabled",
+            True,
+            description="Enable module",
+            validator=Boolean(default=True),
+        ),
+        ConfigValue(
+            "api_key",
+            "",
+            description="API Key",
+            validator=String(default=""),
+        ),
+        ConfigValue(
+            "mode",
+            "default",
+            description="Operation mode",
+            validator=Choice(
+                choices=["default", "fast", "safe"],
+                default="default",
+            ),
+        ),
+    )
+
+    async def on_load(self) -> None:
+        """Load persisted config values from DB into ModuleConfig."""
+        config_dict = await self.kernel.get_module_config(
+            self.name, self.config.to_dict()
+        )
+        self.config.from_dict(config_dict)
+        self.kernel.store_module_config_schema(self.name, self.config)
+```
+
+### Usage (Function-Style)
+
+```python
+from core.lib.loader.module_config import (
+    Boolean,
+    Choice,
+    ConfigValue,
+    ModuleConfig,
+    String,
+)
+
 
 def register(kernel):
     config = ModuleConfig(
@@ -61,34 +121,34 @@ def register(kernel):
             "enabled",
             True,
             description="Enable module",
-            validator=Boolean(default=True)
+            validator=Boolean(default=True),
         ),
         ConfigValue(
             "api_key",
             "",
             description="API Key",
-            validator=String(default="")
+            validator=String(default=""),
         ),
         ConfigValue(
             "mode",
             "default",
             description="Operation mode",
-            validator=Choice(choices=["default", "fast", "safe"], default="default")
-        )
+            validator=Choice(
+                choices=["default", "fast", "safe"],
+                default="default",
+            ),
+        ),
     )
 
-    async def startup():
-        config_dict = await kernel.get_module_config(__name__, {"enabled": True, "api_key": "", "mode": "default"})
+    async def on_load():
+        config_dict = await kernel.get_module_config(
+            __name__, config.to_dict()
+        )
         config.from_dict(config_dict)
         await kernel.save_module_config(__name__, config.to_dict())
         kernel.store_module_config_schema(__name__, config)
 
-    asyncio.create_task(startup())
-
-    # Use get_config() helper for live reading
-    def get_config():
-        live_cfg = getattr(kernel, "_live_module_configs", {}).get(__name__)
-        return live_cfg if live_cfg else config
+    kernel.register_on_load(on_load)
 ```
 
 ### ConfigValue Parameters
@@ -107,8 +167,8 @@ ConfigValue(
 ### Important Notes
 
 1. **Always call `config.to_dict()` before saving** - this adds the `__mcub_config__` marker
-2. **Define defaults twice** - in `ConfigValue` and in the dict for `get_module_config`
-3. **`kernel.store_module_config_schema()` is REQUIRED** - without it, Choice fields won't have inline selection buttons
-4. **Use `get_config()` helper for live reading** - always read from live config, never cache values
-5. **Use Choice instead of String for enums** - provides dropdown UI
-6. **Don't use typing.List for lists** - use String with JSON
+2. **`kernel.store_module_config_schema()` is REQUIRED** - without it, Choice fields won't have inline selection buttons
+3. **Always use `ConfigValue` objects** inside `ModuleConfig()`, never pass validators (`Boolean`, `String`, etc.) directly — `ModuleConfig.__init__` expects `*ConfigValue`
+4. **Read values via `self.config["key"]`** for class-style or `config["key"]` for function-style — always read from the live instance
+5. **Use Choice instead of String for enums** — provides dropdown UI in the config panel
+6. **Don't use `typing.List` for lists** — use `String` with JSON serialization instead

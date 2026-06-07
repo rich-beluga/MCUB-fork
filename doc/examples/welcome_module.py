@@ -5,7 +5,7 @@ from __future__ import annotations
 from telethon import events
 
 from core.lib.loader.module_base import ModuleBase, command, loop, owner, watcher
-from core.lib.loader.module_config import Boolean, ModuleConfig
+from core.lib.loader.module_config import Boolean, ConfigValue, ModuleConfig
 
 
 class WelcomeModule(ModuleBase):
@@ -15,7 +15,12 @@ class WelcomeModule(ModuleBase):
     description = {"ru": "Пpивeтcтвиe нoвыx yчacтникoв", "en": "Welcome new members"}
 
     config = ModuleConfig(
-        Boolean("enabled", default=True),
+        ConfigValue(
+            "enabled",
+            True,
+            description="Enable welcome messages",
+            validator=Boolean(default=True),
+        ),
     )
 
     strings: dict[str, dict[str, str]] = {

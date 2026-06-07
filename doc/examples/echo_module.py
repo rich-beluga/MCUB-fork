@@ -5,7 +5,13 @@ from __future__ import annotations
 from telethon import events
 
 from core.lib.loader.module_base import ModuleBase, command
-from core.lib.loader.module_config import Boolean, Integer, ModuleConfig, String
+from core.lib.loader.module_config import (
+    Boolean,
+    ConfigValue,
+    Integer,
+    ModuleConfig,
+    String,
+)
 
 
 class EchoModule(ModuleBase):
@@ -16,10 +22,30 @@ class EchoModule(ModuleBase):
     dependencies: list[str] = []
 
     config = ModuleConfig(
-        String("prefix", default=">>>"),
-        Boolean("uppercase", default=False),
-        Boolean("reverse", default=False),
-        Integer("repeat", default=1, min=1, max=10),
+        ConfigValue(
+            "prefix",
+            ">>>",
+            description="Text prefix before echoed message",
+            validator=String(default=">>>"),
+        ),
+        ConfigValue(
+            "uppercase",
+            False,
+            description="Convert text to uppercase",
+            validator=Boolean(default=False),
+        ),
+        ConfigValue(
+            "reverse",
+            False,
+            description="Reverse text",
+            validator=Boolean(default=False),
+        ),
+        ConfigValue(
+            "repeat",
+            1,
+            description="Number of times to repeat (1-10)",
+            validator=Integer(default=1, min=1, max=10),
+        ),
     )
 
     strings: dict[str, dict[str, str]] = {
