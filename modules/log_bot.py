@@ -146,7 +146,7 @@ class LogBot(ModuleBase):
 
             try:
                 await asyncio.wait_for(run_git(["fetch", "origin"]), timeout=10)
-            except TimeoutError:
+            except (TimeoutError, asyncio.TimeoutError):
                 return None
 
             code, output = await run_git(
