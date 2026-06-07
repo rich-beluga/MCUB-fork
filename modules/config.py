@@ -3323,7 +3323,9 @@ def register(kernel):
                 if hasattr(kernel, "bot_client"):
                     try:
                         success, _msg = await kernel.inline_query_and_click(
-                            event.chat_id, "cfg"
+                            event.chat_id,
+                            "cfg",
+                            reply_to=getattr(event.message, "reply_to", None),
                         )
 
                         if success:
@@ -3348,7 +3350,9 @@ def register(kernel):
                         f" {module_key}" if module_key else ""
                     )
                     success, _msg = await kernel.inline_query_and_click(
-                        event.chat_id, query
+                        event.chat_id,
+                        query,
+                        reply_to=getattr(event.message, "reply_to", None),
                     )
                     if success:
                         await event.delete()
@@ -3363,7 +3367,9 @@ def register(kernel):
                         return
                     key = args[2].strip()
                     success, _msg = await kernel.inline_query_and_click(
-                        event.chat_id, f"cfg key {key}"
+                        event.chat_id,
+                        f"cfg key {key}",
+                        reply_to=getattr(event.message, "reply_to", None),
                     )
                     if success:
                         await event.delete()
@@ -3382,7 +3388,9 @@ def register(kernel):
                         f" {module_key}" if module_key else ""
                     )
                     success, _msg = await kernel.inline_query_and_click(
-                        event.chat_id, query
+                        event.chat_id,
+                        query,
+                        reply_to=getattr(event.message, "reply_to", None),
                     )
                     if success:
                         await event.delete()
@@ -3393,7 +3401,9 @@ def register(kernel):
                     key = args[2].strip()
                 query = f"cfg key {key}"
                 success, _msg = await kernel.inline_query_and_click(
-                    event.chat_id, query
+                    event.chat_id,
+                    query,
+                    reply_to=getattr(event.message, "reply_to", None),
                 )
                 if success:
                     await event.delete()
