@@ -1,6 +1,7 @@
 telethon_mcub
 aiohttp
 pysocks
+python-socks[asyncio]
 aiosqlite
 socks
 jinja2

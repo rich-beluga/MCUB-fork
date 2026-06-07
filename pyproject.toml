@@ -130,6 +130,7 @@ dependencies = [
     "psutil",
     "aiohttp",
     "pysocks",
+    "python-socks[asyncio]",
     "aiosqlite",
     "cryptg",
     "socks",
