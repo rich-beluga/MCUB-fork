@@ -90,10 +90,6 @@ class SettingsModule(ModuleBase):
             except Exception:
                 return None
 
-        owner_id = getattr(event, "owner_id", None)
-        if owner_id is not None:
-            return int(owner_id)
-
         if event.is_reply:
             reply = await event.get_reply_message()
             reply_sender = getattr(reply, "sender_id", None) if reply else None
