@@ -2237,7 +2237,9 @@ def register(kernel):
 
         except Exception as e:
             kernel.logger.debug(f"FCFG confirm error: {e}")
-            kernel.handle_error(e, message="Config result handler error", event=event)
+            await kernel.handle_error(
+                e, message="Config result handler error", event=event
+            )
 
     async def fcfg_inline_handler(event):
 
