@@ -163,16 +163,41 @@ async def answer(
     caption: str | None = None,
     as_html: bool = False,
     as_emoji: bool = False,
+    kernel: Any = None,
     **kwargs,
 ) -> Any:
     """
     Universal method to reply to a message, edit an inline message, or send a file.
     """
-    kernel = _get_kernel(event)
+    if kernel is None:
+        kernel = _get_kernel(event)
     is_inline = hasattr(event, "edit") and callable(event.edit)
 
     if file:
         return await answer_file(event, file, caption or text, **kwargs)
+
+    # If text exceeds Telegram's message limit, send via inline text pager
+    if (
+        text
+        and len(text) > 3400
+        and kernel
+        and hasattr(kernel, "_inline")
+        and kernel._inline is not None
+    ):
+        try:
+            if not is_inline:
+                try:
+                    await event.delete()
+                except Exception:
+                    pass
+            chat_id = getattr(event, "chat_id", None)
+            if chat_id is not None:
+                return await kernel._inline.text(
+                    chat_id=chat_id,
+                    text=text,
+                )
+        except Exception as e:
+            kernel.logger.error(f"answer -> inline.text failed: {e}")
 
     # Prepare the `buttons` argument for both edit and reply
     if reply_markup is not None:
