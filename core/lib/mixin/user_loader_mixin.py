@@ -8,7 +8,6 @@ import importlib.util
 import inspect
 import os
 import sys
-import warnings
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
@@ -66,7 +65,7 @@ class UserLoaderMixin:
         _hikka_compat = getattr(k, "config", {}).get("hikka_compat", True)
         if _hikka_compat:
             try:
-                from core.lib.loader.hikka_compat import (
+                from core.lib.loader.hikka_compat import (  # noqa: F401
                     is_hikka_module,
                     load_hikka_module,
                 )

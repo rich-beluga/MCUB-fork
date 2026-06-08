@@ -2,15 +2,14 @@
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
-from utils.strings import Strings
 
 import asyncio
 import html
 import io
 import os
 import subprocess
-from datetime import datetime
 import traceback
+from datetime import datetime
 
 import aiohttp
 from telethon import events
@@ -19,20 +18,20 @@ from telethon.tl.functions.messages import (
     AddChatUserRequest,
     CreateChatRequest,
     ExportChatInviteRequest,
+    GetBotCallbackAnswerRequest,
 )
-from telethon.tl.functions.messages import GetBotCallbackAnswerRequest
-
 from telethon.tl.types import InputMediaWebPage, InputUserSelf
 
 import utils
 from core.lib.loader.module_base import ModuleBase, callback, command, loop
 from core.lib.loader.module_config import (
+    Boolean,
     ConfigValue,
     ModuleConfig,
     Placeholders,
     String,
-    Boolean,
 )
+from utils.strings import Strings
 
 
 class LogBot(ModuleBase):
@@ -146,7 +145,7 @@ class LogBot(ModuleBase):
 
             try:
                 await asyncio.wait_for(run_git(["fetch", "origin"]), timeout=10)
-            except (TimeoutError, asyncio.TimeoutError):
+            except TimeoutError:
                 return None
 
             code, output = await run_git(

@@ -105,7 +105,7 @@ class UpdatesMod(loader.ModuleBase):
             )
             try:
                 stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=60)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 proc.kill()
                 await proc.communicate()
                 await msg.edit(self._s("error").format(error="git pull timed out (60s)"), parse_mode="html")
