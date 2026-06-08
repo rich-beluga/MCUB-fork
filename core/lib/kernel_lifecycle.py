@@ -171,99 +171,16 @@ class KernelLifecycleMixin:
         _tele = '<tg-emoji emoji-id="5429283852684124412">🔭</tg-emoji>'
         _note = '<tg-emoji emoji-id="5334882760735598374">📝</tg-emoji>'
 
-        async def message_handler(event):
-            msg = getattr(event, "message", event)
-
-            is_bot = getattr(msg, "via_bot", None)
-            if is_bot is not None:
-                return
-
-            if not self.should_process_command_event(event):
-                self.logger.debug(
-                    "[core_handlers] skip-nonoutgoing handler=message_handler "
-                    "text=%r sender=%r chat=%r out=%r admin=%r",
-                    getattr(msg, "text", None),
-                    getattr(event, "sender_id", None),
-                    getattr(event, "chat_id", None),
-                    getattr(msg, "out", False),
-                    self.is_admin(getattr(event, "sender_id", None)),
-                )
-                return
-
-            if self._is_command_event_processed(event):
-                self.logger.debug(
-                    "[core_handlers] skip-duplicate handler=message_handler "
-                    "text=%r sender=%r chat=%r",
-                    getattr(msg, "text", None),
-                    getattr(event, "sender_id", None),
-                    getattr(event, "chat_id", None),
-                )
-                return
-
-            self._mark_command_event_processed(event)
-            try:
-                await self.process_command(event)
-            except Exception as e:
-                await self.handle_error(e, message="Message handler error", event=event)
-
-                if isinstance(e, RPCError):
-                    cmd_text = html.escape(event.text or "")
-                    rpc_msg = html.escape(str(e))
-                    try:
-                        await event.edit(
-                            f"{_tele} {strings('call_failed', cmd=cmd_text, rpc_msg=rpc_msg)}",
-                            parse_mode="html",
-                        )
-                    except Exception as edit_err:
-                        self.logger.error(
-                            f"{strings('could_not_edit', error=edit_err)}"
-                        )
-                    return
-
-                    tb = traceback.format_exc()
-                    if len(tb) > 1000:
-                        tb = tb[-1000:] + "\n...(truncated)"
-                    safe_cmd = html.escape(event.text or "")
-                    try:
-                        await event.edit(
-                            f"{_tele} {strings('call_failed_traceback', cmd=safe_cmd, traceback=tb)}",
-                            parse_mode="html",
-                        )
-                    except Exception as edit_err:
-                        self.logger.error(f"Could not edit error message: {edit_err}")
-
-        async def fallback_message_handler(event):
-            msg = getattr(event, "message", event)
-
-            is_bot = getattr(msg, "via_bot", None)
-            if is_bot is not None:
-                return
-
-            if not self.should_process_command_event(event):
-                return
-            if self._is_command_event_processed(event):
-                return
-            self.logger.warning(
-                "[core_handlers] fallback-dispatch handler=fallback_message_handler "
-                "text=%r sender=%r chat=%r out=%r admin=%r",
-                getattr(msg, "text", None),
-                getattr(event, "sender_id", None),
-                getattr(event, "chat_id", None),
-                getattr(msg, "out", False),
-                self.is_admin(getattr(event, "sender_id", None)),
+        if self.dispatcher is not None:
+            self._core_message_handler = self.dispatcher.watcher_message_handler
+            self._core_fallback_message_handler = (
+                self.dispatcher.watcher_message_handler
             )
-            is_bot = getattr(msg, "via_bot", None)
-            if is_bot is not None:
-                return
-
-            self._mark_command_event_processed(event)
-            await self.process_command(event)
-
-        self._core_message_handler = message_handler
-        self._core_fallback_message_handler = fallback_message_handler
-        self.client.add_event_handler(message_handler, events.NewMessage())
-        self.client.add_event_handler(message_handler, events.MessageEdited())
-        self.client.add_event_handler(fallback_message_handler, events.NewMessage())
+            self.dispatcher.register()
+        else:
+            self.logger.error(
+                "[core_handlers] dispatcher unavailable — no core handlers registered"
+            )
         self.logger.debug(
             "[core_handlers] registered outgoing handlers builders=%r",
             self._debug_event_builders_snapshot(),
@@ -747,46 +664,11 @@ class KernelLifecycleMixin:
     # Command processing
 
     async def process_command(self, event: Any, depth: int = 0) -> bool:
-        """Match and dispatch an outgoing message event to a command handler.
-
-        Resolves aliases recursively (max depth 5).
-        """
-        if depth > 5:
-            self.logger.error(f"Alias recursion limit reached: {event.text}")
-            await self.log_error_async(f"Alias recursion limit reached: {event.text}")
-            return False
-
-        text = event.text
-        active_prefix = self.get_prefix_for_sender(getattr(event, "sender_id", None))
-        self.logger.debug(
-            "[process_command] depth=%d text=%r sender=%r chat=%r "
-            "handlers=%d aliases=%d",
-            depth,
-            text,
-            getattr(event, "sender_id", None),
-            getattr(event, "chat_id", None),
-            len(self.command_handlers),
-            len(self.aliases),
-        )
-        if not text or not text.startswith(active_prefix):
-            self.logger.debug(
-                "[process_command] ignored text=%r reason=no_prefix prefix=%r",
-                text,
-                active_prefix,
-            )
-            return False
-
-        try:
-            from utils.arg_parser import PipelineParser
-
-            pipeline = PipelineParser(text)
-        except ImportError:
-            pipeline = None
-
-        piped_enabled = self.config.get("piped", True)
-        if pipeline is not None and not pipeline.is_simple() and piped_enabled:
-            return await self._execute_pipeline(event, pipeline, depth)
-        return await self._dispatch_single_command(event, depth, active_prefix)
+        """Proxy to ``dispatcher.process_command``."""
+        if self.dispatcher is not None:
+            return await self.dispatcher.process_command(event, depth)
+        self.logger.error("dispatcher unavailable — cannot process command")
+        return False
 
     def get_prefix_for_sender(self, sender_id: Any) -> str:
         """Resolve sender prefix with admin fallback and global fallback."""
@@ -799,80 +681,6 @@ class KernelLifecycleMixin:
         if admin_key and admin_key in owner_prefixes:
             return owner_prefixes[admin_key]
         return getattr(self, "custom_prefix", ".") or "."
-
-    async def _dispatch_single_command(
-        self, event: Any, depth: int, active_prefix: str
-    ) -> bool:
-        """Dispatch a single (non-pipeline) command to its handler."""
-        text = event.text
-
-        # Guarantee pipeline attributes exist for every handler
-        if not hasattr(event, "piped"):
-            event.piped = False
-        if not hasattr(event, "pipe_input"):
-            event.pipe_input = None
-        if not hasattr(event, "pipe_output"):
-            event.pipe_output = None
-        if not hasattr(event, "pipe_exit_code"):
-            event.pipe_exit_code = 0
-        if not hasattr(event, "no_add_args_to_input"):
-            event.no_add_args_to_input = False
-
-        cmd = (
-            text[len(active_prefix) :].split()[0]
-            if " " in text
-            else text[len(active_prefix) :]
-        )
-
-        if cmd in self.aliases:
-            alias = self.aliases[cmd]
-            self.logger.debug(
-                "[process_command] alias-hit cmd=%r target=%r text=%r",
-                cmd,
-                alias,
-                text,
-            )
-            alias_cmd = alias.split()[0] if " " in alias else alias
-            if alias_cmd not in self.command_handlers and alias_cmd not in self.aliases:
-                self.logger.warning(
-                    f"Alias '{cmd}' points to non-existent target '{alias}', "
-                    f"executing '{cmd}' directly"
-                )
-                if cmd in self.command_handlers:
-                    _cmd_mod = self.command_owners.get(cmd, "unknown")
-                    await self.command_handlers[cmd](
-                        wrap_event_for_module(event, _cmd_mod, self)
-                    )
-                    return True
-                return False
-            args = text[len(active_prefix) + len(cmd) :]
-            new_text = active_prefix + alias + args
-            self._set_event_text(event, new_text)
-            return await self.process_command(event, depth + 1)
-
-        if cmd in self.command_handlers:
-            handler = self.command_handlers[cmd]
-            self.logger.debug(
-                "[process_command] dispatch cmd=%r owner=%r handler=%r",
-                cmd,
-                self.command_owners.get(cmd),
-                getattr(handler, "__name__", repr(handler)),
-            )
-            if not callable(handler):
-                self.logger.warning(
-                    f"Command handler for '{cmd}' is not callable, skipping"
-                )
-                return False
-            _cmd_mod = self.command_owners.get(cmd, "unknown")
-            await handler(wrap_event_for_module(event, _cmd_mod, self))
-            return True
-
-        self.logger.debug(
-            "[process_command] miss cmd=%r known=%r",
-            cmd,
-            sorted(self.command_handlers.keys()),
-        )
-        return False
 
     async def process_bot_command(self, event: Any) -> bool:
         """Dispatch a bot command event to its registered handler."""
@@ -890,91 +698,6 @@ class KernelLifecycleMixin:
             return True
 
         return False
-
-    async def _execute_pipeline(self, event: Any, pipeline: Any, depth: int) -> bool:
-        """Execute a multi-segment pipeline expression."""
-        segments = pipeline.segments
-        if not segments:
-            return False
-        if depth > 5:
-            self.logger.error(f"Pipeline recursion limit reached: {event.text}")
-            await self.log_error_async(
-                f"Pipeline recursion limit reached: {event.text}"
-            )
-            return False
-        if hasattr(event, "no_owner"):
-            await event.edit(
-                f"ignored pipeline command: {event.no_owner()}", parse_mode="html"
-            )
-            return False
-
-        original_edit = getattr(event, "edit", None)
-        original_text = event.text
-        original_piped = getattr(event, "piped", False)
-        original_pipe_input = getattr(event, "pipe_input", None)
-        chat_id = getattr(event, "chat_id", None)
-
-        current_event = event
-        pipe_input = None
-        exit_code = 0
-
-        for i, seg in enumerate(segments):
-            next_seg = segments[i + 1] if i + 1 < len(segments) else None
-
-            if seg.operator == "||":
-                if exit_code == 0:
-                    continue
-            elif seg.operator == "&&":
-                pipe_input = None
-                if not chat_id:
-                    continue
-                try:
-                    sent = await self.client.send_message(chat_id, seg.command)
-                    if not sent:
-                        exit_code = 1
-                        continue
-                    new_ev = self._make_simple_event(sent, seg.command, chat_id)
-                    new_ev.pipe_input = None
-                    is_piped = next_seg is not None and next_seg.operator == "|"
-                    new_ev.piped = is_piped
-                    if is_piped:
-                        pipe_input = await self._run_and_capture(new_ev, depth + 1)
-                    else:
-                        await self.process_command(new_ev, depth=depth + 1)
-                    exit_code = getattr(new_ev, "pipe_exit_code", 0) or 0
-                    current_event = new_ev
-                except Exception:
-                    exit_code = 1
-                continue
-
-            elif seg.operator == "&":
-                pipe_input = None
-                self._wrap_edit_with_fallback(current_event, chat_id)
-
-            is_piped = next_seg is not None and next_seg.operator == "|"
-
-            cmd_text = seg.command
-            current_event.piped = is_piped
-            current_event.pipe_input = pipe_input
-
-            self._set_event_text(current_event, cmd_text)
-
-            if is_piped:
-                pipe_input = await self._run_and_capture(current_event, depth)
-                exit_code = getattr(current_event, "pipe_exit_code", 0) or 0
-            else:
-                if current_event is event and original_edit is not None:
-                    current_event.edit = original_edit
-                await self.process_command(current_event, depth=depth)
-                exit_code = getattr(current_event, "pipe_exit_code", 0) or 0
-                pipe_input = None
-
-        event.piped = original_piped
-        event.pipe_input = original_pipe_input
-        if original_edit is not None:
-            event.edit = original_edit
-        self._set_event_text(event, original_text)
-        return True
 
     def _make_simple_event(self, msg: Any, text: str, chat_id: int) -> Any:
         """Build a lightweight event object wrapping a freshly sent message."""
@@ -1045,35 +768,6 @@ class KernelLifecycleMixin:
                 return await inner_self._client.get_entity(inner_self.chat_id)
 
         return _SimpleEvent()
-
-    def _wrap_edit_with_fallback(self, ev: Any, chat_id: int) -> None:
-        """Wrap ev.edit so that on failure it falls back to send_message."""
-        original_edit = getattr(ev, "edit", None)
-        kernel = self
-
-        async def _fallback_edit(new_text, *args, parse_mode=None, **kwargs):
-            if original_edit is not None:
-                try:
-                    return await original_edit(
-                        new_text, *args, parse_mode=parse_mode, **kwargs
-                    )
-                except Exception as _err:
-                    kernel.logger.debug(
-                        "[& edit-fallback] edit failed (%s), sending new message", _err
-                    )
-            try:
-                sent = await kernel.client.send_message(
-                    chat_id, new_text, parse_mode=parse_mode
-                )
-                if sent and hasattr(sent, "id"):
-                    ev.id = sent.id
-                    ev.message_id = sent.id
-                return sent
-            except Exception:
-                return None
-            return None
-
-        ev.edit = _fallback_edit
 
     async def _run_and_capture(self, ev: Any, depth: int) -> str | None:
         """Run ev through process_command and return the text passed to event.edit."""

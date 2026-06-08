@@ -62,67 +62,16 @@ class Kernel(_StandardKernel):
         self._telegram_handler = telegram_handler
         self._kernel_logger = kernel_logger
 
-        import html
-        import traceback
-
-        from telethon import events
-
-        async def message_handler(event):
-            _tele = '<tg-emoji emoji-id="5429283852684124412">🔭</tg-emoji>'
-            _note = '<tg-emoji emoji-id="5334882760735598374">📝</tg-emoji>'
-            getattr(event, "message", event)
-
-            if not self.should_process_command_event(event):
-                return
-            if self._is_command_event_processed(event):
-                return
-
-            self._mark_command_event_processed(event)
-            try:
-                await self.process_command(event)
-            except Exception as e:
-                await self.handle_error(e, message="Message handler error", event=event)
-                from telethon.errors import RPCError
-
-                lang = self.config.get("language", "ru")
-                from core.langpacks import get_kernel_strings
-
-                s = get_kernel_strings(lang)
-
-                if isinstance(e, RPCError):
-                    try:
-                        await event.edit(
-                            f"{_tele} {s.get('rpc_error', '').format(error=html.escape(str(e)))}",
-                            parse_mode="html",
-                        )
-                    except Exception:
-                        pass
-                    return
-
-                tb = traceback.format_exc()
-                if len(tb) > 1000:
-                    tb = tb[-1000:] + "\n...(truncated)"
-                try:
-                    await event.edit(
-                        f"{_tele} {s.get('call_failed_traceback', '').format(cmd=html.escape(event.text or ''), traceback=tb)}",
-                        parse_mode="html",
-                    )
-                except Exception:
-                    pass
-
-        async def fallback_message_handler(event):
-            if not self.should_process_command_event(event):
-                return
-            if self._is_command_event_processed(event):
-                return
-            self._mark_command_event_processed(event)
-            await self.process_command(event)
-
-        self._core_message_handler = message_handler
-        self._core_fallback_message_handler = fallback_message_handler
-        self.client.add_event_handler(message_handler, events.NewMessage())
-        self.client.add_event_handler(message_handler, events.MessageEdited())
-        self.client.add_event_handler(fallback_message_handler, events.NewMessage())
+        if self.dispatcher is not None:
+            self._core_message_handler = self.dispatcher.watcher_message_handler
+            self._core_fallback_message_handler = (
+                self.dispatcher.watcher_message_handler
+            )
+            self.dispatcher.register()
+        else:
+            self.logger.error(
+                "[core_handlers] dispatcher unavailable — no core handlers registered"
+            )
 
         modules_start = time.time()
         await self.load_system_modules()

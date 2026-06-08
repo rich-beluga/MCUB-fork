@@ -1065,89 +1065,10 @@ class Kernel:
         return await handler(event)
 
     async def process_command(self, event, depth: int = 0) -> bool:
-        """Dispatch an outgoing message to the matching command handler.
-
-        Resolves aliases recursively up to MAX_ALIAS_DEPTH.
-        """
-        if depth > MAX_ALIAS_DEPTH:
-            self.logger.error(f"alias recursion limit reached: {event.text!r}")
-            return False
-
-        text = event.text
-        active_prefix = self.get_prefix_for_sender(getattr(event, "sender_id", None))
-        self.logger.debug(
-            "[process_command] depth=%d text=%r sender=%r chat=%r handlers=%d aliases=%d",
-            depth,
-            text,
-            getattr(event, "sender_id", None),
-            getattr(event, "chat_id", None),
-            len(self.command_handlers),
-            len(self.aliases),
-        )
-        if not text or not text.startswith(active_prefix):
-            self.logger.debug(
-                "[process_command] ignored text=%r reason=no_prefix prefix=%r",
-                text,
-                active_prefix,
-            )
-            return False
-
-        cmd = (
-            text[len(active_prefix) :].split()[0]
-            if " " in text
-            else text[len(active_prefix) :]
-        )
-
-        if cmd in self.aliases:
-            alias = self.aliases[cmd]
-            # Extract just the command name (first word) from alias for the check
-            alias_cmd = alias.split()[0] if " " in alias else alias
-            args = text[len(active_prefix) + len(cmd) :]
-            # Use full alias (with its args) plus user args
-            new_text = active_prefix + alias + args
-            self.logger.debug(
-                "[process_command] alias-hit cmd=%r target=%r text=%r",
-                cmd,
-                alias,
-                text,
-            )
-            # Extract just the command name (first word) from alias for the check
-            alias_cmd = alias.split()[0] if " " in alias else alias
-            if alias_cmd not in self.command_handlers and alias_cmd not in self.aliases:
-                self.logger.warning(
-                    f"Alias '{cmd}' points to non-existent target '{alias}', "
-                    f"executing '{cmd}' directly"
-                )
-                if cmd in self.command_handlers:
-                    await self.command_handlers[cmd](event)
-                    return True
-                return False
-            event.text = new_text
-            if hasattr(event, "message"):
-                event.message.message = new_text
-                event.message.text = new_text
-            # Always use recursive text replacement for aliases
-            return await self.process_command(event, depth + 1)
-
-        if cmd in self.command_handlers:
-            self.logger.debug(
-                "[process_command] dispatch cmd=%r owner=%r handler=%r",
-                cmd,
-                self.command_owners.get(cmd),
-                getattr(
-                    self.command_handlers[cmd],
-                    "__name__",
-                    repr(self.command_handlers[cmd]),
-                ),
-            )
-            await self.command_handlers[cmd](event)
-            return True
-
-        self.logger.debug(
-            "[process_command] miss cmd=%r known=%r",
-            cmd,
-            sorted(self.command_handlers.keys()),
-        )
+        """Proxy to ``dispatcher.process_command``."""
+        if self.dispatcher is not None:
+            return await self.dispatcher.process_command(event, depth)
+        self.logger.error("dispatcher unavailable — cannot process command")
         return False
 
     def get_prefix_for_sender(self, sender_id):
@@ -1360,67 +1281,20 @@ class Kernel:
             self.inline_bot = InlineBot(self)
             await self.inline_bot.setup()
 
-        async def _on_message(event):
-            msg = getattr(event, "message", event)
-            if not self.should_process_command_event(event):
-                self.logger.debug(
-                    "[core_handlers] skip-nonoutgoing handler=_on_message text=%r sender=%r chat=%r out=%r admin=%r",
-                    getattr(msg, "text", None),
-                    getattr(event, "sender_id", None),
-                    getattr(event, "chat_id", None),
-                    getattr(msg, "out", False),
-                    self.is_admin(getattr(event, "sender_id", None)),
-                )
-                return
-            if self._is_command_event_processed(event):
-                self.logger.debug(
-                    "[core_handlers] skip-duplicate handler=_on_message text=%r sender=%r chat=%r",
-                    getattr(msg, "text", None),
-                    getattr(event, "sender_id", None),
-                    getattr(event, "chat_id", None),
-                )
-                return
-            self._mark_command_event_processed(event)
-            try:
-                await self.process_command(event)
-            except Exception as e:
-                await self.handle_error(e, message="Message handler error", event=event)
-                tb = traceback.format_exc()
-                if len(tb) > 1000:
-                    tb = "…" + tb[-997:]
-                try:
-                    await event.edit(
-                        f"<b>Error in <code>{event.text}</code></b>\n<pre>{tb}</pre>",
-                        parse_mode="html",
-                    )
-                except Exception:
-                    pass
-
-        async def _fallback_on_message(event):
-            msg = getattr(event, "message", event)
-            if not self.should_process_command_event(event):
-                return
-            if self._is_command_event_processed(event):
-                return
-            self.logger.warning(
-                "[core_handlers] fallback-dispatch handler=_fallback_on_message text=%r sender=%r chat=%r out=%r admin=%r",
-                getattr(msg, "text", None),
-                getattr(event, "sender_id", None),
-                getattr(event, "chat_id", None),
-                getattr(msg, "out", False),
-                self.is_admin(getattr(event, "sender_id", None)),
+        if self.dispatcher is not None:
+            self._core_message_handler = self.dispatcher.watcher_message_handler
+            self._core_fallback_message_handler = (
+                self.dispatcher.watcher_message_handler
             )
-            self._mark_command_event_processed(event)
-            await self.process_command(event)
-
-        self._core_message_handler = _on_message
-        self._core_fallback_message_handler = _fallback_on_message
-        self.client.add_event_handler(_on_message, events.NewMessage())
-        self.client.add_event_handler(_fallback_on_message, events.NewMessage())
-        self.logger.debug(
-            "[core_handlers] registered outgoing handlers builders=%r",
-            self._debug_event_builders_snapshot(),
-        )
+            self.dispatcher.register()
+            self.logger.debug(
+                "[core_handlers] registered dispatcher builders=%r",
+                self._debug_event_builders_snapshot(),
+            )
+        else:
+            self.logger.error(
+                "[core_handlers] dispatcher unavailable — no core handlers registered"
+            )
 
         await self._notify_early_restart()
 

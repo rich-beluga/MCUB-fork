@@ -47,6 +47,13 @@ class KernelHandlersMixin:
             event_type = type(event_obj).__name__
             if event_type not in dedupe_types:
                 continue
+            # Never dedupe the central command handler
+            if callback is getattr(self, "_core_message_handler", None):
+                seen.add(self._event_builder_signature(event_obj, callback))
+                continue
+            if callback is getattr(self, "_core_fallback_message_handler", None):
+                seen.add(self._event_builder_signature(event_obj, callback))
+                continue
             signature = self._event_builder_signature(event_obj, callback)
             if signature in seen:
                 self.client.remove_event_handler(callback, event_obj)

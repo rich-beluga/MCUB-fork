@@ -289,6 +289,15 @@ class KernelCoreMixin:
             self._warn("Register", e)
             self.register = None
 
+        # Dispatcher
+        try:
+            from core.lib.loader.dispatcher import CommandDispatcher
+
+            self.dispatcher = CommandDispatcher(self) if CommandDispatcher else None
+        except Exception as e:
+            self._warn("CommandDispatcher", e)
+            self.dispatcher = None
+
         # Callback permissions
         try:
             self.callback_permissions = (
