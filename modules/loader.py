@@ -319,10 +319,6 @@ class Loader(ModuleBase):
                 return "old"
         return "unknown"
 
-    # ------------------------------------------------------------------ #
-    #  Comment-header metadata helpers                                     #
-    # ------------------------------------------------------------------ #
-
     # Values that kernel.get_module_metadata() emits when it cannot parse
     # a field from function-style modules (comment headers).
     _META_DEFAULTS: dict[str, set] = {
@@ -376,8 +372,6 @@ class Loader(ModuleBase):
         """Return the ``# name: ...`` comment value, or *None* if absent."""
         m = re.search(r"^#\s*name\s*:\s*(\S+)", code, re.MULTILINE)
         return m.group(1).strip() if m else None
-
-    # ------------------------------------------------------------------ #
 
     def _get_source_link(self, module_name: str) -> str:
         source = self.kernel._module_sources.get(module_name)
