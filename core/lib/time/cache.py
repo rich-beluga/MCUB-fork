@@ -2,9 +2,10 @@
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
 # author: @Hairpin00
-# version: 1.0.1
+# version: 1.1.0
 # description: TTL Cache implementation with LRU eviction
 
+import heapq
 import time
 from collections import OrderedDict
 from typing import Any
@@ -19,6 +20,11 @@ class TTLCache:
     This cache stores key-value pairs with an expiration time. When the cache
     reaches its maximum size, it removes the least recently used item.
     Expired items are automatically removed upon access.
+
+    Performance notes (v1.1.0):
+    - ``_cleanup_expired`` was O(n) — now uses a min-heap of (expire_time, key)
+      so expiry sweeps are O(k log n) where k = number of expired keys.
+    - ``get`` is O(1) average; ``set`` is O(log n) amortised due to heap push.
 
     Attributes:
         max_size (int): Maximum number of items the cache can hold
@@ -37,6 +43,10 @@ class TTLCache:
         self.cache: CacheType = OrderedDict()
         self.max_size = max_size
         self.ttl = ttl
+        # Min-heap of (expire_time, key) — lets _cleanup_expired stop early
+        # once it hits a non-expired entry instead of scanning the whole dict.
+        # Entries may be stale (key already evicted/updated); we skip them.
+        self._expiry_heap: list[tuple[float, Any]] = []
 
     def set(self, key: Any, value: Any, ttl: int | None = None) -> None:
         """
@@ -51,8 +61,8 @@ class TTLCache:
             If the cache exceeds max_size after insertion, the least recently
             used item is removed. The new item becomes the most recently used.
         """
-        # Memory leak fix: clean up expired entries before adding new ones
         if len(self.cache) >= self.max_size:
+            # Fast path: try to reclaim expired slots before evicting LRU.
             self._cleanup_expired()
             if len(self.cache) >= self.max_size:
                 self.cache.popitem(last=False)
@@ -60,6 +70,8 @@ class TTLCache:
         expire_time = time.time() + (ttl if ttl is not None else self.ttl)
         self.cache[key] = (expire_time, value)
         self.cache.move_to_end(key)
+        # Push to the expiry heap so cleanup can find it in O(log n).
+        heapq.heappush(self._expiry_heap, (expire_time, key))
 
     def get(self, key: Any) -> Any | None:
         """
@@ -79,44 +91,40 @@ class TTLCache:
 
         expire_time, value = self.cache[key]
 
-        # Check if the item has expired
         if time.time() <= expire_time:
-            # Mark as recently used and return value
             self.cache.move_to_end(key)
             return value
-        else:
-            # Remove expired item
-            del self.cache[key]
-            return None
+
+        # Expired — evict lazily.
+        del self.cache[key]
+        return None
 
     def clear(self) -> None:
-        """
-        Remove all items from the cache.
-        """
+        """Remove all items from the cache."""
         self.cache.clear()
+        self._expiry_heap.clear()
 
     def size(self) -> int:
-        """
-        Get the current number of items in the cache.
-
-        Returns:
-            Number of items currently stored in the cache
-        """
+        """Get the current number of items in the cache."""
         return len(self.cache)
 
     def _cleanup_expired(self) -> None:
-        """
-        Remove all expired items from the cache.
+        """Remove expired items using the min-heap for early termination.
 
-        Note: This is an internal method that can be called periodically
-        to clean up expired items without requiring access attempts.
+        Complexity: O(k log n) where k = expired entries found, vs O(n) before.
+        Stops as soon as the heap top is in the future — no need to scan the
+        entire cache.
         """
-        current_time = time.time()
-        expired_keys = [
-            key
-            for key, (expire_time, _) in self.cache.items()
-            if current_time >= expire_time
-        ]
-
-        for key in expired_keys:
-            del self.cache[key]
+        now = time.time()
+        while self._expiry_heap:
+            exp, key = self._expiry_heap[0]
+            if exp > now:
+                # All remaining heap entries expire in the future.
+                break
+            heapq.heappop(self._expiry_heap)
+            # The heap entry may be stale (key was already evicted or re-set
+            # with a newer expire_time).  Only delete if the stored expire_time
+            # matches the heap entry exactly.
+            entry = self.cache.get(key)
+            if entry is not None and entry[0] <= now:
+                del self.cache[key]
