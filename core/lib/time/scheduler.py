@@ -9,7 +9,10 @@ import asyncio
 import traceback
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from core.lib.types import Kernel
 
 
 class TaskScheduler:
@@ -24,7 +27,7 @@ class TaskScheduler:
         running: Flag indicating whether the scheduler is active
     """
 
-    def __init__(self, kernel: Any) -> None:
+    def __init__(self, kernel: Kernel) -> None:
         """
         Initialize the task scheduler.
 
