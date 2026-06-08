@@ -55,10 +55,13 @@ python3 -m core --set-default-core mycore
 
 ```python
 class Kernel(_StandardKernel):
-    async def handle_error(self, e, message=None, event=None, source="unknown"):
-        await super().handle_error(e, message=message, event=event, source=source)
+    async def handle_error(self, e, source="unknown", message=None, event=None):
+        await super().handle_error(e, source=source, message=message, event=event)
         await my_monitoring.send(f"[{message or source}] {e}")
 ```
+
+> [!NOTE]
+> In newer versions, `source` is an alias for `message`. You can omit `source` and just pass `message`.
 
 ## Core Naming Conventions
 

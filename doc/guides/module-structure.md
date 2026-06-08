@@ -30,7 +30,7 @@ Each module file can contain special comment directives:
 | `# banner_url:` | URL to image for banner display on load/man |
 | `# scop:` | Kernel compatibility constraints |
 
-### `# name:` — Canonical Module Name
+### `# name:` - Canonical Module Name
 
 The `# name:` directive sets the **canonical registered name** of the module.
 The loader uses this name instead of the filename for:
@@ -45,7 +45,7 @@ The loader uses this name instead of the filename for:
 # description: Logs online/offline status of selected users
 ```
 
-**Important:** if two files share the same `# name:`, the second one **will** conflict — this is intentional, as it prevents duplicate commands.
+**Important:** if two files share the same `# name:`, the second one **will** conflict - this is intentional, as it prevents duplicate commands.
 
 ### Class-style Modules
 
@@ -62,7 +62,7 @@ class MyModule(ModuleBase):
 
 When both a `# name:` comment **and** a class `name` attribute are present, the **class attribute takes precedence**.
 
-For **function-style** modules (`def register(kernel):`), the `# name:` comment **is required** — without it the loader will skip the module with an error.
+For **function-style** modules (`def register(kernel):`), the `# name:` comment **is required** - without it the loader will skip the module with an error.
 
 ## Banner (`# banner_url:`)
 

@@ -50,7 +50,7 @@ The recommended way to create module configuration. Provides:
 | `Emoji(default=..., min_count=1, max_count=None)` | Valid emoji or emoji sequence |
 | `EntityLike(default=...)` | Telegram entity-like value: ID, `@username`, `t.me` link or URL |
 
-### Usage (Class-Style — Recommended)
+### Usage (Class-Style - Recommended)
 
 ```python
 from __future__ import annotations
@@ -168,7 +168,7 @@ ConfigValue(
 
 1. **Always call `config.to_dict()` before saving** - this adds the `__mcub_config__` marker
 2. **`kernel.store_module_config_schema()` is REQUIRED** - without it, Choice fields won't have inline selection buttons
-3. **Always use `ConfigValue` objects** inside `ModuleConfig()`, never pass validators (`Boolean`, `String`, etc.) directly — `ModuleConfig.__init__` expects `*ConfigValue`
-4. **Read values via `self.config["key"]`** for class-style or `config["key"]` for function-style — always read from the live instance
-5. **Use Choice instead of String for enums** — provides dropdown UI in the config panel
-6. **Don't use `typing.List` for lists** — use `String` with JSON serialization instead
+3. **Always use `ConfigValue` objects** inside `ModuleConfig()`, never pass validators (`Boolean`, `String`, etc.) directly - `ModuleConfig.__init__` expects `*ConfigValue`
+4. **Read values via `self.config["key"]`** for class-style or `config["key"]` for function-style - always read from the live instance
+5. **Use Choice instead of String for enums** - provides dropdown UI in the config panel
+6. **Don't use `typing.List` for lists** - use `String` with JSON serialization instead

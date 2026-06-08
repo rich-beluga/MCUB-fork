@@ -69,6 +69,152 @@ Class attributes define module metadata:
 > [!NOTE]
 > For localized `description` dicts, loader/man pick text by current kernel language (`language` config), then fallback to `en`, then `ru`, then first non-empty value.
 
+## Instance Methods (self.*)
+
+All `ModuleBase` subclasses have these built-in helper methods:
+
+### Message Helpers
+
+`self.args(event)` - Parse command arguments. Returns parsed args via `utils.parse_arguments()`.
+
+```python
+@command("sum")
+async def cmd_sum(self, event):
+    args = self.args(event)   # [1, 2, 3]
+    await self.edit(event, f"Sum: {sum(args)}")
+```
+
+`self.args_raw(event)` - Get raw unparsed argument string after the command name.
+
+`self.args_html(event)` - Get raw arguments as HTML-escaped string.
+
+### Reply / Edit / Answer
+
+`self.answer(event, text, **kwargs)` - Smart reply (edit or reply depending on context).
+
+`self.edit(event, text, **kwargs)` - Edit the source message. Supports `reply_markup`, `as_html`, `link_preview`, `parse_mode`.
+
+`self.reply(event, text, **kwargs)` - Reply to the source message.
+
+```python
+@command("hello")
+async def cmd_hello(self, event):
+    await self.answer(event, "Hello!")     # auto-detect
+    await self.edit(event, "<b>bold</b>", as_html=True)
+    await self.reply(event, "This is a reply")
+```
+
+### Module Interaction
+
+`self.lookup_module(module_name, *, all_loaded=False)` - Find a loaded module by name (case-insensitive). Returns the module or `None`.
+
+`self.require_module(module_name, *, all_loaded=False)` - Same as `lookup_module`, but raises `LookupError` if not found.
+
+```python
+other = self.lookup_module("SomeModule")
+if other:
+    await other.some_method()
+
+required = self.require_module("EssentialModule")
+```
+
+`self.invoke(command, args=None, chat_id=None, reply_to=None)` - Programmatically invoke another command.
+
+```python
+await self.invoke("ping")
+await self.invoke("echo", args="hello world", chat_id=-100123456789)
+```
+
+### Inline Forms
+
+`self.inline(chat_id, title, fields=None, buttons=None, auto_send=True, ttl=200, reply_to=None, **kwargs)` - Send an inline form (wraps `kernel.inline_form()`).
+
+```python
+success, msg = await self.inline(
+    event.chat_id,
+    "User Info",
+    fields=[{"key": "Name", "value": "John"}],
+    buttons=[{"text": "Edit", "type": "callback", "data": "edit"}],
+)
+```
+
+`self.inline_temp(func, ttl=300, article=None, data=None) -> str` - Register a temporary inline command handler. Returns an 8-character `form_id`.
+
+`self.get_inline_temp_id(method_name, module_name=None) -> str | None` - Get the `form_id` for a previously registered inline_temp method.
+
+### Library Import
+
+`async def import_lib(url, *, name=None) -> Any` - Import a Python library from a remote URL at runtime. Caches and returns the imported module.
+
+```python
+xlib = await self.import_lib("https://raw.githubusercontent.com/hairpin01/repo-MCUB-fork/main/lib/xlib.py")
+await self.edit(event, xlib.format_size(1024))
+# → "1 KB"
+```
+
+### Utility
+
+`self.get_prefix()` - Returns current command prefix (`"."` by default).
+
+`self.get_lang()` - Returns current language code (`"ru"`, `"en"`, etc.).
+
+---
+
+## ButtonFactory (`self.Button`)
+
+Access via `self.Button`. Creates Telegram `Button` objects with the MCUB callback token system.
+
+| Method | Description |
+|--------|-------------|
+| `self.Button.inline(text, callback_func, *, ttl=900, ...)` | Inline/callback button with auto-generated token |
+| `self.Button.url(text, url, *, icon=None, style=None)` | URL button |
+| `self.Button.text(text, *, resize=True, ...)` | Reply keyboard text button |
+| `self.Button.switch(text, query="", *, same_peer=True, ...)` | Switch-inline button |
+| `self.Button.copy(text="Copy", *, payload=None, ...)` | Copy text button |
+| `self.Button.request_phone(text="Share Phone", ...)` | Request phone number |
+| `self.Button.request_location(text="Share Location", ...)` | Request location |
+| `self.Button.request_poll(text="Poll", *, quiz=False, ...)` | Poll button |
+| `self.Button.game(text)` | Game button |
+| `self.Button.unknown(text, data, *, icon=None, style=None)` | Raw callback data button |
+
+```python
+async def on_color(self, event, color):
+    await event.answer(f"You picked {color}!", alert=True)
+
+@command("color")
+async def cmd_color(self, event):
+    buttons = [
+        [self.Button.inline("Red", self.on_color, args=("red",))],
+        [self.Button.inline("Blue", self.on_color, args=("blue",))],
+        [self.Button.url("GitHub", "https://github.com")],
+    ]
+    await self.inline(event.chat_id, "Pick a color", buttons=buttons)
+```
+
+---
+
+## Additional Lifecycle Callbacks
+
+In addition to `on_load` and `on_unload`:
+
+| Method | When called |
+|--------|-------------|
+| `async def on_install(self)` | Only on first install, not on reload |
+| `async def on_reload(self)` | When module is reloaded via loader |
+| `async def on_config_update(self, key, old_value, new_value)` | When kernel config changes |
+| `async def on_language_change(self, new_lang)` | When bot language changes |
+
+```python
+class MyModule(ModuleBase):
+    async def on_reload(self):
+        self.log.info("Module reloaded!")
+
+    async def on_config_update(self, key, old_value, new_value):
+        self.log.info(f"Config {key}: {old_value} -> {new_value}")
+```
+
+---
+
 ## Decorators
 
 ### `@command(pattern: str, *, alias: str | list[str] | None=None, doc: dict | None=None, doc_ru: str | None=None, doc_en: str | None=None)`
