@@ -2,15 +2,14 @@
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
-from utils.strings import Strings
 
 import asyncio
 import html
 import io
 import os
 import subprocess
-from datetime import datetime
 import traceback
+from datetime import datetime
 
 import aiohttp
 from telethon import events
@@ -20,20 +19,20 @@ from telethon.tl.functions.messages import (
     AddChatUserRequest,
     CreateChatRequest,
     ExportChatInviteRequest,
+    GetBotCallbackAnswerRequest,
 )
-from telethon.tl.functions.messages import GetBotCallbackAnswerRequest
-
 from telethon.tl.types import InputMediaWebPage, InputUserSelf
 
 import utils
 from core.lib.loader.module_base import ModuleBase, callback, command, loop
 from core.lib.loader.module_config import (
+    Boolean,
     ConfigValue,
     ModuleConfig,
     Placeholders,
     String,
-    Boolean,
 )
+from utils.strings import Strings
 
 
 class LogBot(ModuleBase):
@@ -147,7 +146,7 @@ class LogBot(ModuleBase):
 
             try:
                 await asyncio.wait_for(run_git(["fetch", "origin"]), timeout=10)
-            except (TimeoutError, asyncio.TimeoutError):
+            except TimeoutError:
                 return None
 
             code, output = await run_git(
@@ -433,8 +432,15 @@ class LogBot(ModuleBase):
             self.log.debug(f"Chat created. ID: {self.kernel.log_chat_id}")
 
             try:
+                # Use the project's own GitHub-hosted avatar instead of a
+                # third-party paste/shortlink service (x0.at) that could be
+                # taken down, redirected, or serve malicious content.
+                _LOG_GROUP_AVATAR_URL = (
+                    "https://raw.githubusercontent.com/hairpin01/MCUB-fork"
+                    "/refs/heads/main/img/start_userbot.png"
+                )
                 async with aiohttp.ClientSession() as session:
-                    async with session.get("https://x0.at/QHok.jpg") as resp:
+                    async with session.get(_LOG_GROUP_AVATAR_URL) as resp:
                         if resp.status == 200:
                             photo_data = await resp.read()
 

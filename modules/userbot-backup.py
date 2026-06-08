@@ -4,7 +4,6 @@
 # requires: cryptography
 
 from __future__ import annotations
-from utils.strings import Strings
 
 import asyncio
 import fnmatch
@@ -39,6 +38,7 @@ from core.lib.loader.module_config import (
     Secret,
     String,
 )
+from utils.strings import Strings
 
 
 def _derive_fernet_key(password: str, salt: bytes) -> bytes:
@@ -1244,6 +1244,12 @@ class Backup(ModuleBase):
             return
 
         reply = await event.get_reply_message()
+        # Delete the command message immediately so the password is not left
+        # visible in chat history (other sessions / Telegram cloud storage).
+        try:
+            await event.delete()
+        except Exception:
+            pass
         await self._restore_from_backup_message(reply, event, password=password)
 
     @callback()
