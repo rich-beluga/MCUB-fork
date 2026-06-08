@@ -11,6 +11,10 @@ import concurrent.futures
 import os
 import re
 import traceback
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from core.lib.types import Event
 
 
 class KernelPipelineMixin:
@@ -240,7 +244,7 @@ class KernelPipelineMixin:
         self,
         text: str,
         pipe_input: str = "",
-        event: Any = None,
+        event: Event | None = None,
         active_prefix: str = "",
     ) -> str:
         """Like ``pipe_interpolate`` but also resolves ``@(cmd)``."""
@@ -267,7 +271,7 @@ class KernelPipelineMixin:
                 def __init__(self_):
                     self_.text = cmd
                     self_.piped = True
-                    self_.pipe_input = ""
+                    self_.pipe_input = parent_pipe_input
                     self_.pipe_output = None
                     self_.pipe_exit_code = 0
                     self_.no_add_args_to_input = False
@@ -276,8 +280,8 @@ class KernelPipelineMixin:
                     self_._captured = captured
                     self_._prefix = active_prefix
 
-                async def edit(self_, new_text: Any = "", *a: Any, **kw: Any) -> None:
-                    self_._captured.append("" if new_text is None else str(new_text))
+                async def edit(self_, new_text: str, *a: Any, **kw: Any) -> None:
+                    self_._captured.append(new_text)
 
                 async def respond(self_, *a: Any, **kw: Any) -> None:
                     pass
@@ -291,22 +295,30 @@ class KernelPipelineMixin:
                 def __getattr__(self_, name: str) -> Any:
                     return lambda *a, **kw: None
 
+            parent_pipe_input = (
+                getattr(event, "pipe_input", None) or "" if event else ""
+            )
             proxy = _CaptureEvent()
             try:
-                result_flag = await dispatcher.process_command(proxy)
-                pipe_code = getattr(proxy, "pipe_exit_code", "?")
+                ok = await dispatcher.process_command(proxy, depth=1)
+                exit_code = getattr(proxy, "pipe_exit_code", 0) or 0
+                # Propagate exit_code back to parent event
+                if event is not None:
+                    event.pipe_exit_code = exit_code
                 self.logger.debug(
-                    "[pipe] @(cmd) %r → captured=%d exit_code=%s result=%s",
+                    "[pipe] @(cmd) %r ok=%s captured=%d exit_code=%d",
                     cmd,
+                    ok,
                     len(captured),
-                    pipe_code,
-                    result_flag,
+                    exit_code,
                 )
             except Exception as exc:
-                self.logger.debug("[pipe] @(cmd) %r failed: %s", cmd, exc)
-                return f"<@ERR:{exc}>"
+                self.logger.warning("[pipe] @(cmd) %r raised: %s", cmd, exc)
+                return f"<@{type(exc).__name__}>"
             if not captured:
-                self.logger.debug("[pipe] @(cmd) %r — no output captured", cmd)
+                self.logger.debug("[pipe] @(cmd) %r — no edit captured", cmd)
+                if exit_code == 5:
+                    return f"<@cmd_not_found: {cmd}>"
                 return ""
             return captured[-1]
 
@@ -325,7 +337,9 @@ class KernelPipelineMixin:
 
         return "".join(parts)
 
-    async def _execute_pipeline(self, event: Any, pipeline: Any, depth: int) -> bool:
+    async def _execute_pipeline(
+        self, event: Event, pipeline: Any, depth: int
+    ) -> bool:  # noqa: ANN401
         """Execute a multi-segment pipeline expression."""
         segments = pipeline.segments
         if not segments:
@@ -435,7 +449,9 @@ class KernelPipelineMixin:
                 return text.split()[0] if text else None
         return None
 
-    def _make_simple_event(self, msg: Any, text: str, chat_id: int) -> Any:
+    def _make_simple_event(
+        self, msg: Any, text: str, chat_id: int
+    ) -> Event:  # noqa: ANN401
         """Build a lightweight event object wrapping a freshly sent message."""
         kernel = self
 
