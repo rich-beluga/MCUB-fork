@@ -2137,9 +2137,19 @@ class Loader(ModuleBase):
                             old_file_backup, old_file_backup_path, file_path, add_log
                         )
                         return
-                    # Rename to canonical so the file is saved correctly
+                    # Rename to canonical so the file is saved correctly.
+                    # The file was already downloaded to the old path, so we
+                    # move it to the canonical destination before load.
+                    old_downloaded_path = file_path
                     module_name = canonical
                     file_path = self.kernel._loader.get_module_path(module_name)
+                    if old_downloaded_path != file_path:
+                        if os.path.exists(old_downloaded_path):
+                            os.replace(old_downloaded_path, file_path)
+                            add_log(
+                                f"[iload] moved file: {os.path.basename(old_downloaded_path)!r}"
+                                f" → {os.path.basename(file_path)!r}"
+                            )
 
             if is_update:
                 new_version = metadata["version"]
