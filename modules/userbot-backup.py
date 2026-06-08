@@ -4,7 +4,6 @@
 # requires: cryptography
 
 from __future__ import annotations
-from utils.strings import Strings
 
 import asyncio
 import fnmatch
@@ -39,6 +38,7 @@ from core.lib.loader.module_config import (
     Secret,
     String,
 )
+from utils.strings import Strings
 
 
 def _derive_fernet_key(password: str, salt: bytes) -> bytes:

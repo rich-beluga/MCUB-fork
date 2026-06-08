@@ -2,7 +2,6 @@
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
 from __future__ import annotations
-from utils.strings import Strings
 
 import html
 import io
@@ -16,6 +15,7 @@ from telethon import events
 import core.lib.loader.module_base as loader
 from core.lib.loader.module_base import ModuleBase, command
 from core.lib.utils.logger import ErrorFormatter
+from utils.strings import Strings
 
 CUSTOM_EMOJI = {
     "🧿": '<tg-emoji emoji-id="5426900601101374618">🧿</tg-emoji>',

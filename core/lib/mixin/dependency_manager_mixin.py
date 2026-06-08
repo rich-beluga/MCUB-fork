@@ -313,7 +313,7 @@ class DependencyManagerMixin:
         # Log individual failures but continue - a single failed dep should not
         # block *all* modules from loading.  The per-module loading phase will
         # catch missing deps again and skip affected modules gracefully.
-        for dep, result in zip(missing, results):
+        for dep, result in zip(missing, results, strict=False):
             if isinstance(result, Exception):
                 k.logger.warning(
                     f"[batch-deps] failed to install '{dep}' "
