@@ -320,10 +320,6 @@ class Loader(ModuleBase):
                 return "old"
         return "unknown"
 
-    # ------------------------------------------------------------------ #
-    #  Comment-header metadata helpers                                     #
-    # ------------------------------------------------------------------ #
-
     # Values that kernel.get_module_metadata() emits when it cannot parse
     # a field from function-style modules (comment headers).
     _META_DEFAULTS: dict[str, set] = {
@@ -377,8 +373,6 @@ class Loader(ModuleBase):
         """Return the ``# name: ...`` comment value, or *None* if absent."""
         m = re.search(r"^#\s*name\s*:\s*(\S+)", code, re.MULTILINE)
         return m.group(1).strip() if m else None
-
-    # ------------------------------------------------------------------ #
 
     def _get_source_link(self, module_name: str) -> str:
         source = self.kernel._module_sources.get(module_name)
@@ -2138,9 +2132,19 @@ class Loader(ModuleBase):
                             old_file_backup, old_file_backup_path, file_path, add_log
                         )
                         return
-                    # Rename to canonical so the file is saved correctly
+                    # Rename to canonical so the file is saved correctly.
+                    # The file was already downloaded to the old path, so we
+                    # move it to the canonical destination before load.
+                    old_downloaded_path = file_path
                     module_name = canonical
                     file_path = self.kernel._loader.get_module_path(module_name)
+                    if old_downloaded_path != file_path:
+                        if os.path.exists(old_downloaded_path):
+                            os.replace(old_downloaded_path, file_path)
+                            add_log(
+                                f"[iload] moved file: {os.path.basename(old_downloaded_path)!r}"
+                                f" → {os.path.basename(file_path)!r}"
+                            )
 
             if is_update:
                 new_version = metadata["version"]

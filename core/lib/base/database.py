@@ -82,13 +82,20 @@ class DatabaseManager:
                 return key[0] + "***" + key[-1]
         return key
 
+    # Hard cap on in-memory get-cache entries.  Beyond this the LRU sentinel
+    # (oldest key) is dropped.  Prevents unbounded growth when many modules
+    # each store dozens of keys (e.g. config module, trusted module, etc.).
+    _GET_CACHE_MAXSIZE = 2048
+
     def __init__(self, kernel):
         self.kernel = kernel
         self.conn = None
         self.logger = kernel.logger
-        # Write-through cache for db_get: { "module:key": value }
-        # Cleared on any db_set/db_delete for the same module:key.
+        # Write-through LRU cache for db_get: { "module:key": value }
+        # Bounded to _GET_CACHE_MAXSIZE entries; cleared on db_set/db_delete.
         self._get_cache: dict[str, str | None] = {}
+        # Pending write buffer for db_set_many / flush_writes.
+        self._write_buf: list[tuple[str, str, str]] = []
 
     def _resolve_db_file(self) -> str:
         """Resolve database path from kernel settings with a safe fallback."""
@@ -199,6 +206,23 @@ class DatabaseManager:
             db_file = self._resolve_db_file()
             self.logger.debug(f"[DB] init_db connecting to {db_file}")
             self.conn = await aiosqlite.connect(db_file)
+
+            # ── Performance pragmas ────────────────────────────────────────
+            # WAL: readers never block writers and vice-versa; dramatically
+            # reduces contention during startup when many modules write configs
+            # simultaneously.
+            await self.conn.execute("PRAGMA journal_mode = WAL")
+            # NORMAL syncs only at checkpoints, not every commit — safe for
+            # a userbot where occasional data loss on power-failure is acceptable.
+            await self.conn.execute("PRAGMA synchronous = NORMAL")
+            # 8 MB page cache (negative value = kibibytes).
+            await self.conn.execute("PRAGMA cache_size = -8000")
+            # Keep temp tables in RAM instead of a temp file.
+            await self.conn.execute("PRAGMA temp_store = MEMORY")
+            # Memory-map the first 64 MB of the DB file for O(1) reads.
+            await self.conn.execute("PRAGMA mmap_size = 67108864")
+            # ──────────────────────────────────────────────────────────────
+
             await self._create_tables()
             # Lock the DB file right after creation/open
             ensure_locked_after_write(db_file, self.logger)
@@ -234,6 +258,21 @@ class DatabaseManager:
         """Replace characters not allowed in identifiers with underscores."""
         return re.sub(r"[^a-zA-Z0-9_.\-:]+", "_", value)
 
+    def _cache_put(self, cache_key: str, value: str | None) -> None:
+        """Insert into the bounded LRU get-cache, evicting the oldest entry if full."""
+        if cache_key in self._get_cache:
+            # Refresh: remove then re-insert at the end (OrderedDict not used here
+            # but plain dict preserves insertion order in CPython 3.7+).
+            del self._get_cache[cache_key]
+        elif len(self._get_cache) >= self._GET_CACHE_MAXSIZE:
+            # Drop the oldest entry (first in insertion order).
+            try:
+                oldest = next(iter(self._get_cache))
+                del self._get_cache[oldest]
+            except StopIteration:
+                pass
+        self._get_cache[cache_key] = value
+
     async def db_set(self, module: str, key: str, value: Any):
         """Save value for a module key (write-through cache invalidate)."""
         self.logger.debug(f"[DB] db_set module={module} key={self.mask_key(key)}")
@@ -252,6 +291,43 @@ class DatabaseManager:
         await self.conn.commit()
         self._get_cache.pop(f"{module}:{key}", None)
         self.logger.debug("[DB] db_set done")
+
+    async def db_set_many(self, rows: list[tuple[str, str, Any]]) -> None:
+        """Write multiple (module, key, value) rows in a single transaction.
+
+        Much faster than N individual db_set() calls during startup when
+        many modules persist their configs at the same time.
+
+        Args:
+            rows: List of (module, key, value) tuples.
+        """
+        if not rows:
+            return
+        if not self.conn:
+            raise RuntimeError("Database is not initialized")
+
+        validated = []
+        for module, key, value in rows:
+            if not self._validate_identifier(module) or not self._validate_identifier(key):
+                self.logger.warning(
+                    f"[DB] db_set_many skipping invalid identifier: module={module!r} key={key!r}"
+                )
+                continue
+            validated.append((module, key, str(value)))
+
+        if not validated:
+            return
+
+        await self.conn.executemany(
+            "INSERT OR REPLACE INTO module_data VALUES (?, ?, ?)", validated
+        )
+        await self.conn.commit()
+
+        # Invalidate cache for all written keys.
+        for module, key, _ in validated:
+            self._get_cache.pop(f"{module}:{key}", None)
+
+        self.logger.debug("[DB] db_set_many wrote %d rows", len(validated))
 
     async def db_get(self, module: str, key: str) -> str | None:
         """Get value for a module key (cached)."""
@@ -276,7 +352,7 @@ class DatabaseManager:
         row = await cursor.fetchone()
         await cursor.close()
         result = row[0] if row else None
-        self._get_cache[cache_key] = result
+        self._cache_put(cache_key, result)
         self.logger.debug(f"[DB] db_get result={'found' if result else 'none'}")
         return result
 
