@@ -13,6 +13,8 @@ import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from core.lib.types.event import Event
+
 try:
     from telethon import events
 except ImportError:
@@ -30,7 +32,7 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from core.lib.types import Event, Kernel, Message
+    from core.lib.types import Kernel, Message
 
 
 try:

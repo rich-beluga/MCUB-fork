@@ -12,6 +12,8 @@ import logging
 import traceback
 from typing import TYPE_CHECKING, Any
 
+from core.lib.types.event import Event
+
 try:
     from telethon import events
     from telethon.errors import RPCError
@@ -30,7 +32,7 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from core.lib.types import Event, Kernel
+    from core.lib.types import Kernel
 
 
 try:

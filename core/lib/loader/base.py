@@ -9,6 +9,8 @@ from abc import ABC
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from core.lib.types.event import Event
+
 try:
     from core.lib.loader.kernel_proxy import wrap_event_for_module
 except ImportError:
@@ -20,7 +22,7 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from core.lib.types import Event, Kernel
+    from core.lib.types import Kernel
     from core.lib.types.client import Client
     from core.lib.types.message import Message
 

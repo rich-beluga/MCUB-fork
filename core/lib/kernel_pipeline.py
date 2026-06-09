@@ -11,10 +11,9 @@ import concurrent.futures
 import os
 import re
 import traceback
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from core.lib.types import Event
+from core.lib.types.event import Event
 
 
 class KernelPipelineMixin:

@@ -11,10 +11,9 @@ import importlib.util
 import os
 import sys
 import time
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from core.lib.types import Event
+from core.lib.types.event import Event
 
 # McubTelethonError (graceful fallback)───────
 try:
