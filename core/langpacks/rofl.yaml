@@ -1,5 +1,8 @@
 lang: ru  # Base language for fallback
 
+null:
+  null: 'null'
+
 error:
   __global__: on
   error: "❌ Тpeш: {error}"

@@ -1,5 +1,8 @@
 lang: ru
 
+null:
+  null: 'null'
+
 error:
   __global__: on
   full_error: '🚫 <b>Error:</b> <code>{error}</code>
