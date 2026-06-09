@@ -283,11 +283,11 @@ class KernelPipelineMixin:
                 async def edit(self_, new_text: str, *a: Any, **kw: Any) -> None:
                     self_._captured.append(new_text)
 
-                async def respond(self_, *a: Any, **kw: Any) -> None:
-                    pass
+                async def respond(self_, new_text: str, *a: Any, **kw: Any) -> None:
+                    self_._captured.append(new_text)
 
-                async def reply(self_, *a: Any, **kw: Any) -> None:
-                    pass
+                async def reply(self_, new_text: str, *a: Any, **kw: Any) -> None:
+                    self_._captured.append(new_text)
 
                 async def delete(self_) -> None:
                     pass
@@ -326,6 +326,9 @@ class KernelPipelineMixin:
                     log_warning("[pipe] @(cmd) %r raised: %s", cmd, exc)
                 return f"<@{type(exc).__name__}>"
             if not captured:
+                pipe_out = getattr(proxy, "pipe_output", None)
+                if pipe_out:
+                    return str(pipe_out)
                 self.logger.debug("[pipe] @(cmd) %r — no edit captured", cmd)
                 if exit_code == 5:
                     return f"<@cmd_not_found: {cmd}>"
@@ -347,9 +350,7 @@ class KernelPipelineMixin:
 
         return "".join(parts)
 
-    async def _execute_pipeline(
-        self, event: Event, pipeline: Any, depth: int
-    ) -> bool:
+    async def _execute_pipeline(self, event: Event, pipeline: Any, depth: int) -> bool:
         """Execute a multi-segment pipeline expression."""
         segments = pipeline.segments
         if not segments:
@@ -459,9 +460,7 @@ class KernelPipelineMixin:
                 return text.split()[0] if text else None
         return None
 
-    def _make_simple_event(
-        self, msg: Any, text: str, chat_id: int
-    ) -> Event:
+    def _make_simple_event(self, msg: Any, text: str, chat_id: int) -> Event:
         return make_simple_event(self, msg, text, chat_id)
 
     def _wrap_edit_with_fallback(self, ev: Any, chat_id: int) -> None:

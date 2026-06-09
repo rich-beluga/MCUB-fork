@@ -227,6 +227,7 @@ class KernelLifecycleMixin:
                 )
             except Exception:
                 pass
+
         self.client.set_protection_mode("safe")
         modules_start = time.time()
 

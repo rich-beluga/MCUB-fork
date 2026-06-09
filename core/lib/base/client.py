@@ -246,6 +246,11 @@ class ClientManager:
                 getattr(me, "first_name", None),
             )
             k.logger.info(f"Authorized as: {me.first_name} (ID: {me.id})")
+            k.premium_user = True if me.premium else False
+
+            if not k.premium_user and getattr(k.client, "convert_emoji"):
+                k.client.convert_emoji = True
+                k.logger.debug("convert emoji on: %s", k.client.convert_emoji)
             return True
 
         except Exception as e:
