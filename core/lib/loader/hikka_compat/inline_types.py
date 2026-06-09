@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
+from __future__ import annotations
+
 import logging
 import types
 import typing
@@ -213,7 +215,7 @@ class InlineMessage:
         self,
         inline_message_id: str,
         unit_id: str,
-        inline_proxy: "_InlineProxy",
+        inline_proxy: _InlineProxy,
         chat_id: int | None = None,
         message_id: int | None = None,
     ):
@@ -242,7 +244,7 @@ class InlineMessage:
     def default_parse_mode(self, value: str | None) -> None:
         self._default_parse_mode = value
 
-    async def edit(self, *args, **kwargs) -> "InlineMessage":
+    async def edit(self, *args, **kwargs) -> InlineMessage:
         kwargs.pop("unit_id", None)
         kwargs.pop("inline_message_id", None)
         kwargs.pop("chat_id", None)
@@ -313,7 +315,7 @@ class BotMessage:
         self,
         chat_id: int,
         message_id: int,
-        inline_proxy: typing.Optional["_InlineProxy"] = None,
+        inline_proxy: _InlineProxy | None = None,
         unit_id: str = "",
     ):
         self.chat_id = chat_id
@@ -340,7 +342,7 @@ class BotMessage:
     def default_parse_mode(self, value: str | None) -> None:
         self._default_parse_mode = value
 
-    async def edit(self, *args, **kwargs) -> "BotMessage":
+    async def edit(self, *args, **kwargs) -> BotMessage:
         kwargs.pop("unit_id", None)
         kwargs.pop("chat_id", None)
         kwargs.pop("message_id", None)
@@ -405,7 +407,7 @@ class InlineCall:
         self,
         call_data: str,
         unit_id: str,
-        inline_proxy: "_InlineProxy",
+        inline_proxy: _InlineProxy,
         *,
         original_call=None,
         inline_message_id: str | None = None,
@@ -505,7 +507,7 @@ class BotInlineCall(InlineCall):
         self,
         event,
         *,
-        inline_proxy: "_InlineProxy",
+        inline_proxy: _InlineProxy,
         unit_id: str,
     ):
         self._event = event
@@ -547,7 +549,7 @@ class InlineQuery:
         query: str = "",
         offset: str = "",
         user_id: int | None = None,
-        inline_proxy: "_InlineProxy" = None,
+        inline_proxy: _InlineProxy = None,
         original_event=None,
         inline_query=None,
     ):
@@ -588,7 +590,7 @@ class InlineQuery:
         class _CompatInlineQuery:
             """Compatibility wrapper for inline_query to support answer() calls."""
 
-            def __init__(inner_self, parent: "InlineQuery"):
+            def __init__(inner_self, parent: InlineQuery):
                 inner_self._parent = parent
                 inner_self.query_id = parent.query_id
                 inner_self.query = parent.query

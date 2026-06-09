@@ -29,6 +29,7 @@ from telethon import events, install_uvloop
 from core.lib.loader.kernel_proxy import wrap_event_for_module
 from core.lib.utils import purge_caches
 from core.lib.utils.colors import Colors
+from core.lib.utils.event_helpers import make_simple_event, run_and_capture
 from core.lib.utils.logger import KernelLogger, setup_telegram_logging
 from utils.restart import read_restart_context
 
@@ -705,105 +706,10 @@ class KernelLifecycleMixin:
         return False
 
     def _make_simple_event(self, msg: Message, text: str, chat_id: int) -> Event:
-        """Build a lightweight event object wrapping a freshly sent message."""
-        kernel = self
-
-        class _SimpleEvent:
-            def __init__(inner_self) -> None:
-                inner_self.id = getattr(msg, "id", None)
-                inner_self.message_id = inner_self.id
-                inner_self.chat_id = chat_id
-                inner_self.text = text
-                inner_self.message = msg
-                inner_self.sender_id = getattr(msg, "sender_id", None)
-                inner_self.reply_to_msg_id = getattr(msg, "reply_to_msg_id", None)
-                inner_self._client = kernel.client
-                inner_self.pipe_input = None
-                inner_self.pipe_output = None
-                inner_self.pipe_exit_code = 0
-                inner_self.piped = False
-                inner_self.no_add_args_to_input = False
-
-            async def delete(inner_self):
-                try:
-                    await inner_self._client.delete_messages(
-                        inner_self.chat_id, [inner_self.id]
-                    )
-                except Exception:
-                    pass
-
-            async def get_reply_message(inner_self):
-                if not inner_self.reply_to_msg_id:
-                    return None
-                try:
-                    return await inner_self._client.get_messages(
-                        inner_self.chat_id, ids=inner_self.reply_to_msg_id
-                    )
-                except Exception:
-                    return None
-
-            async def edit(inner_self, new_text, *args, parse_mode=None, **kwargs):
-                try:
-                    return await inner_self._client.edit_message(
-                        inner_self.chat_id,
-                        inner_self.id,
-                        new_text,
-                        parse_mode=parse_mode,
-                    )
-                except Exception as _err:
-                    kernel.logger.debug(
-                        "[SimpleEvent.edit] edit failed (%s), falling back to send_message",
-                        _err,
-                    )
-                    try:
-                        sent = await inner_self._client.send_message(
-                            inner_self.chat_id, new_text, parse_mode=parse_mode
-                        )
-                        if sent and hasattr(sent, "id"):
-                            inner_self.id = sent.id
-                            inner_self.message_id = sent.id
-                        return sent
-                    except Exception:
-                        return None
-
-            async def get_sender(inner_self):
-                return await inner_self._client.get_entity(inner_self.sender_id)
-
-            async def get_chat(inner_self):
-                return await inner_self._client.get_entity(inner_self.chat_id)
-
-        return _SimpleEvent()
+        return make_simple_event(self, msg, text, chat_id)
 
     async def _run_and_capture(self, ev: Any, depth: int) -> str | None:
-        """Run ev through process_command and return the text passed to event.edit."""
-        captured = []
-        orig_edit = getattr(ev, "edit", None)
-
-        class _FakeMsg:
-            async def edit(inner_self, *a, **kw):
-                return inner_self
-
-        async def _cap(new_text, *args, **kwargs):
-            if isinstance(new_text, str):
-                captured.append(new_text)
-            return _FakeMsg()
-
-        ev.edit = _cap
-        try:
-            await self.process_command(ev, depth=depth)
-        finally:
-            if orig_edit is not None:
-                ev.edit = orig_edit
-            else:
-                try:
-                    del ev.edit
-                except AttributeError:
-                    pass
-
-        explicit = getattr(ev, "pipe_output", None)
-        return (
-            explicit if explicit is not None else (captured[-1] if captured else None)
-        )
+        return await run_and_capture(self, ev, depth)
 
     # User/Thread utilities
 
