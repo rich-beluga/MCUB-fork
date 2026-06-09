@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import json
@@ -111,7 +113,7 @@ SYSTEM_VERSIONS = [
 class ClientManager:
     """Manages the user Telegram client and the optional inline bot."""
 
-    def __init__(self, kernel: "Kernel") -> None:
+    def __init__(self, kernel: Kernel) -> None:
         self.k = kernel
 
     def _get_session_path(self, name: str) -> str:

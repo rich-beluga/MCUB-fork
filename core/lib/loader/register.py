@@ -5,6 +5,8 @@
 # version: 1.0.3
 # description: Registration system for Telegram bot handlers
 
+from __future__ import annotations
+
 import asyncio
 import inspect
 import re
@@ -26,8 +28,8 @@ try:
 except ImportError:
 
     def wrap_event_for_module(
-        e: Any, *a: Any, **kw: Any  # noqa: ANN401
-    ) -> Any:  # noqa: ANN401
+        e: Any, *a: Any, **kw: Any
+    ) -> Any:
         return e
 
 
@@ -925,7 +927,7 @@ class Register:
             >>>     checker.stop()
         """
 
-        def decorator(f: Callable) -> "InfiniteLoop":
+        def decorator(f: Callable) -> InfiniteLoop:
             nonlocal module
             bound_instance = getattr(f, "__bound_instance__", None)
             raw_func = getattr(f, "__original__", f)
@@ -1070,6 +1072,36 @@ class Register:
         """
         return self.kernel.bot_command_handlers.copy()
 
+    def _watcher_info_from_entry(
+        self, entry: tuple, module_name: str, disabled: set
+    ) -> dict[str, Any]:
+        wrapper, event_obj = entry[0], entry[1]
+        client = entry[2] if len(entry) > 2 else self.kernel.client
+        meta = entry[3] if len(entry) > 3 and isinstance(entry[3], dict) else {}
+        watcher_module = meta.get(
+            "module",
+            getattr(wrapper, "__watcher_module__", module_name),
+        )
+        watcher_name = meta.get(
+            "method",
+            getattr(
+                wrapper,
+                "__watcher_name__",
+                getattr(wrapper, "__name__", "unknown"),
+            ),
+        )
+        watcher_key = self._watcher_key(watcher_module, watcher_name)
+        return {
+            "module": watcher_module,
+            "method": watcher_name,
+            "enabled": watcher_key not in disabled,
+            "tags": dict(meta.get("tags", {})),
+            "bot_client": bool(meta.get("bot_client", False)),
+            "wrapper": wrapper,
+            "event": event_obj,
+            "client": client,
+        }
+
     def get_watchers(self) -> list[dict[str, Any]]:
         """
         Get all registered watchers from all modules.
@@ -1087,71 +1119,13 @@ class Register:
             if reg is self:
                 if hasattr(self, "_all_watchers"):
                     for entry in self._all_watchers:
-                        wrapper, event_obj = entry[0], entry[1]
-                        client = entry[2] if len(entry) > 2 else self.kernel.client
-                        meta = (
-                            entry[3]
-                            if len(entry) > 3 and isinstance(entry[3], dict)
-                            else {}
-                        )
-                        watcher_module = meta.get(
-                            "module",
-                            getattr(wrapper, "__watcher_module__", module_name),
-                        )
-                        watcher_name = meta.get(
-                            "method",
-                            getattr(
-                                wrapper,
-                                "__watcher_name__",
-                                getattr(wrapper, "__name__", "unknown"),
-                            ),
-                        )
-                        watcher_key = self._watcher_key(watcher_module, watcher_name)
                         watchers.append(
-                            {
-                                "module": watcher_module,
-                                "method": watcher_name,
-                                "enabled": watcher_key not in disabled,
-                                "tags": dict(meta.get("tags", {})),
-                                "bot_client": bool(meta.get("bot_client", False)),
-                                "wrapper": wrapper,
-                                "event": event_obj,
-                                "client": client,
-                            }
+                            self._watcher_info_from_entry(entry, module_name, disabled)
                         )
             elif reg and hasattr(reg, "_all_watchers"):
                 for entry in reg._all_watchers:
-                    wrapper, event_obj = entry[0], entry[1]
-                    client = entry[2] if len(entry) > 2 else self.kernel.client
-                    meta = (
-                        entry[3]
-                        if len(entry) > 3 and isinstance(entry[3], dict)
-                        else {}
-                    )
-                    watcher_module = meta.get(
-                        "module",
-                        getattr(wrapper, "__watcher_module__", module_name),
-                    )
-                    watcher_name = meta.get(
-                        "method",
-                        getattr(
-                            wrapper,
-                            "__watcher_name__",
-                            getattr(wrapper, "__name__", "unknown"),
-                        ),
-                    )
-                    watcher_key = self._watcher_key(watcher_module, watcher_name)
                     watchers.append(
-                        {
-                            "module": watcher_module,
-                            "method": watcher_name,
-                            "enabled": watcher_key not in disabled,
-                            "tags": dict(meta.get("tags", {})),
-                            "bot_client": bool(meta.get("bot_client", False)),
-                            "wrapper": wrapper,
-                            "event": event_obj,
-                            "client": client,
-                        }
+                        self._watcher_info_from_entry(entry, module_name, disabled)
                     )
             elif reg and hasattr(reg, "__watchers__"):
                 for entry in reg.__watchers__:
@@ -1559,7 +1533,7 @@ class Register:
         self,
         msg: Message,
         original_event: Event | None = None,
-    ) -> "_MessageEventProxy":
+    ) -> _MessageEventProxy:
         """Wrap a raw Telegram ``Message`` as an event-like proxy.
 
         The returned object quacks like a userbot event and can be fed to

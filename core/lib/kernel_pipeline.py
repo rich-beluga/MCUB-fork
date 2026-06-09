@@ -14,6 +14,7 @@ import traceback
 from typing import Any
 
 from core.lib.types.event import Event
+from core.lib.utils.event_helpers import make_simple_event, run_and_capture
 
 
 class KernelPipelineMixin:
@@ -295,14 +296,19 @@ class KernelPipelineMixin:
                     pass
 
                 def __getattr__(self_, name: str) -> Any:
-                    return _.__get__(self_, type(self_))
+                    return object.__getattribute__(self_, "_")
 
             parent_pipe_input = (
                 getattr(event, "pipe_input", None) or "" if event else ""
             )
             proxy = _CaptureEvent()
             try:
-                ok = await dispatcher.process_command(proxy, depth=1)
+                try:
+                    ok = await dispatcher.process_command(proxy, depth=1)
+                except TypeError as exc:
+                    if "unexpected keyword argument 'depth'" not in str(exc):
+                        raise
+                    ok = await dispatcher.process_command(proxy)
                 exit_code = getattr(proxy, "pipe_exit_code", 0) or 0
                 # Propagate exit_code back to parent event
                 if event is not None:
@@ -315,7 +321,9 @@ class KernelPipelineMixin:
                     exit_code,
                 )
             except Exception as exc:
-                self.logger.warning("[pipe] @(cmd) %r raised: %s", cmd, exc)
+                log_warning = getattr(self.logger, "warning", None)
+                if log_warning is not None:
+                    log_warning("[pipe] @(cmd) %r raised: %s", cmd, exc)
                 return f"<@{type(exc).__name__}>"
             if not captured:
                 self.logger.debug("[pipe] @(cmd) %r — no edit captured", cmd)
@@ -341,7 +349,7 @@ class KernelPipelineMixin:
 
     async def _execute_pipeline(
         self, event: Event, pipeline: Any, depth: int
-    ) -> bool:  # noqa: ANN401
+    ) -> bool:
         """Execute a multi-segment pipeline expression."""
         segments = pipeline.segments
         if not segments:
@@ -453,75 +461,8 @@ class KernelPipelineMixin:
 
     def _make_simple_event(
         self, msg: Any, text: str, chat_id: int
-    ) -> Event:  # noqa: ANN401
-        """Build a lightweight event object wrapping a freshly sent message."""
-        kernel = self
-
-        class _SimpleEvent:
-            def __init__(inner_self) -> None:
-                inner_self.id = getattr(msg, "id", None)
-                inner_self.message_id = inner_self.id
-                inner_self.chat_id = chat_id
-                inner_self.text = text
-                inner_self.message = msg
-                inner_self.sender_id = getattr(msg, "sender_id", None)
-                inner_self.reply_to_msg_id = getattr(msg, "reply_to_msg_id", None)
-                inner_self._client = kernel.client
-                inner_self.pipe_input = None
-                inner_self.pipe_output = None
-                inner_self.pipe_exit_code = 0
-                inner_self.piped = False
-                inner_self.no_add_args_to_input = False
-
-            async def delete(inner_self):
-                try:
-                    await inner_self._client.delete_messages(
-                        inner_self.chat_id, [inner_self.id]
-                    )
-                except Exception:
-                    pass
-
-            async def get_reply_message(inner_self):
-                if not inner_self.reply_to_msg_id:
-                    return None
-                try:
-                    return await inner_self._client.get_messages(
-                        inner_self.chat_id, ids=inner_self.reply_to_msg_id
-                    )
-                except Exception:
-                    return None
-
-            async def edit(inner_self, new_text, *args, parse_mode=None, **kwargs):
-                try:
-                    return await inner_self._client.edit_message(
-                        inner_self.chat_id,
-                        inner_self.id,
-                        new_text,
-                        parse_mode=parse_mode,
-                    )
-                except Exception as _err:
-                    kernel.logger.debug(
-                        "[SimpleEvent.edit] edit failed (%s), falling back to send_message",
-                        _err,
-                    )
-                    try:
-                        sent = await inner_self._client.send_message(
-                            inner_self.chat_id, new_text, parse_mode=parse_mode
-                        )
-                        if sent and hasattr(sent, "id"):
-                            inner_self.id = sent.id
-                            inner_self.message_id = sent.id
-                        return sent
-                    except Exception:
-                        return None
-
-            async def get_sender(inner_self):
-                return await inner_self._client.get_entity(inner_self.sender_id)
-
-            async def get_chat(inner_self):
-                return await inner_self._client.get_entity(inner_self.chat_id)
-
-        return _SimpleEvent()
+    ) -> Event:
+        return make_simple_event(self, msg, text, chat_id)
 
     def _wrap_edit_with_fallback(self, ev: Any, chat_id: int) -> None:
         """Wrap ev.edit so that on failure it falls back to send_message."""
@@ -553,35 +494,7 @@ class KernelPipelineMixin:
         ev.edit = _fallback_edit
 
     async def _run_and_capture(self, ev: Any, depth: int) -> str | None:
-        """Run ev through process_command and return the text passed to event.edit."""
-        captured = []
-        orig_edit = getattr(ev, "edit", None)
-
-        class _FakeMsg:
-            async def edit(inner_self, *a, **kw):
-                return inner_self
-
-        async def _cap(new_text, *args, **kwargs):
-            if isinstance(new_text, str):
-                captured.append(new_text)
-            return _FakeMsg()
-
-        ev.edit = _cap
-        try:
-            await self.process_command(ev, depth=depth)
-        finally:
-            if orig_edit is not None:
-                ev.edit = orig_edit
-            else:
-                try:
-                    del ev.edit
-                except AttributeError:
-                    pass
-
-        explicit = getattr(ev, "pipe_output", None)
-        return (
-            explicit if explicit is not None else (captured[-1] if captured else None)
-        )
+        return await run_and_capture(self, ev, depth)
 
     # User/Thread utilities
 

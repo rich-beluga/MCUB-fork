@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
+from __future__ import annotations
+
 import hashlib
 import json
 import os
@@ -39,7 +41,7 @@ class ConfigManager:
 
     BACKUP_FILENAME = ".backup-config.json"
 
-    def __init__(self, kernel: "Kernel") -> None:
+    def __init__(self, kernel: Kernel) -> None:
         self.k = kernel
         self._backup_api_hash = ""
         self._previous_config = {}
