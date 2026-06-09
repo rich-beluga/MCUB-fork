@@ -10,6 +10,7 @@ from typing import Any
 
 __all__ = [
     "LANGPACKS",
+    "clear_langpacks_cache",
     "get_all_module_strings",
     "get_available_locales",
     "get_kernel_strings",
@@ -23,6 +24,11 @@ LANGPACKS: dict[str, dict[str, Any]] = {}
 _GLOBAL_MODULE = "__global__"
 _GLOBAL_MARKER = "__global__"
 _GROUP_VALUE = "__value__"
+
+
+def clear_langpacks_cache() -> None:
+    """Clear the langpacks cache so the next get_langpacks() call reloads from disk."""
+    LANGPACKS.clear()
 
 
 def _is_global_marker(value: Any) -> bool:
