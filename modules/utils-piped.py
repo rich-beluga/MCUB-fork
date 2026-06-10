@@ -1307,6 +1307,8 @@ class UtilsPiped(ModuleBase):
 
             if args == "text":
                 result = reply_msg.text or reply_msg.caption or ""
+            elif args == "html":
+                result = html.escape(reply_msg.html_text) or ""
             elif args == "raw":
                 result = reply_msg.raw_text or ""
             elif args == "id":
