@@ -2769,7 +2769,9 @@ class Module:
     def __init__(self):
         pass
 
-    def _mcub_bind(self, kernel, module_type: str = "native") -> None:
+    def _mcub_bind(
+        self, kernel, module_type: str = "native", *, module_name: str | None = None
+    ) -> None:
         from ..kernel_proxy import ClientProxy
 
         self._kernel = kernel
@@ -2790,6 +2792,21 @@ class Module:
             kernel.client.dispatcher = types.SimpleNamespace()
         if getattr(kernel.client.dispatcher, "security", None) is None:
             kernel.client.dispatcher.security = _CompatSecurityManager(self.client)
+
+        # Store the kernel module key so that register_placeholder can
+        # use it as the native scope — matching what .man looks up.
+        self._module_name = module_name or type(self).__name__
+
+        # Auto-register methods decorated with @loader.placeholder.
+        try:
+            from utils.custom_placeholders import (
+                register_decorated_placeholders as _rdp,
+                register_placeholder as _nreg,
+            )
+
+            _rdp(self._module_name, self)
+        except ImportError:
+            pass
         _raw_strings = type(self).__dict__.get("strings", {"name": type(self).__name__})
         self._db_owner = _raw_strings.get("name") or type(self).__name__
         self.name = _raw_strings.get("name", self._db_owner)
@@ -3111,6 +3128,12 @@ class _Utils:
     @staticmethod
     async def answer(message, text: str, **kwargs) -> None:
         parse_mode = kwargs.pop("parse_mode", "html")
+        try:
+            from utils.custom_placeholders import resolve_placeholders as _res
+
+            text = await _res("any", text)
+        except ImportError:
+            pass
         try:
             await message.edit(text, parse_mode=parse_mode, **kwargs)
         except Exception:

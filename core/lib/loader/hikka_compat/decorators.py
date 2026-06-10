@@ -281,9 +281,21 @@ def loop(
 
 
 class Placeholder:
-    """Placeholder class."""
+    """Decorator that marks a method as a placeholder provider.
 
-    pass
+    The method name becomes the placeholder key, callable as ``{name}``
+    in message text.  The decorated method is auto-registered with the
+    native placeholders system when the module loads.
+    """
+
+    def __call__(self, func):
+        meta = list(getattr(func, "__custom_placeholders__", []))
+        meta.append({"key": func.__name__})
+        func.__custom_placeholders__ = meta
+        return func
+
+
+placeholder = Placeholder()
 
 
 async def stop_placeholder() -> bool:

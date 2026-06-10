@@ -262,6 +262,18 @@ class InlineMessage:
 
         reply_markup = kwargs.pop("reply_markup", None)
 
+        # Resolve {placeholders} in the message text via the native system.
+        try:
+            from utils.custom_placeholders import resolve_placeholders as _res
+
+            if args:
+                resolved = await _res("any", str(args[0]))
+                args = (resolved, *args[1:])
+            if "text" in kwargs:
+                kwargs["text"] = await _res("any", str(kwargs["text"]))
+        except ImportError:
+            pass
+
         # If we have a stored callback event, use event.edit() directly.
         # The event carries an already-resolved InputPeer, bypassing the
         # entity-resolution issue that affects bot_client.edit_message().
@@ -513,14 +525,14 @@ class InlineCall:
         if self.original_call is not None and hasattr(self.original_call, "answer"):
             try:
                 await self.original_call.answer(
-                    text=text,
-                    show_alert=show_alert,
+                    message=text,
+                    alert=show_alert,
                     url=url,
                 )
                 self._answered = True
                 return
             except Exception as e:
-                logger.debug("InlineCall.answer fallback due to error: %s", e)
+                logger.error("InlineCall.answer failed: %s", e)
 
         self._answered = True
 
