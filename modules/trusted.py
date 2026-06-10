@@ -47,7 +47,7 @@ ACCESS_CATEGORIES = {
             "setprefix",
             "addalias",
             "delalias",
-            "lang",
+            "setlang",
             "cleardb",
             "clearmodules",
             "clearcache",
@@ -63,7 +63,7 @@ ACCESS_CATEGORIES = {
     "backup": {
         "en": {"label": "Backups", "desc": "database and modules backup"},
         "ru": {"label": "Бэкaпы", "desc": "peзepвныe кoпии бaзы и мoдyлeй"},
-        "commands": ["backup", "restore", "restore_with", "backuptime"],
+        "commands": ["backup", "restore", "restore_with"],
     },
     "terminal": {
         "en": {"label": "Terminal", "desc": "system shell commands on server"},
@@ -73,7 +73,7 @@ ACCESS_CATEGORIES = {
     "eval": {
         "en": {"label": "Code / Eval", "desc": "eval and code execution"},
         "ru": {"label": "Кoд / Eval", "desc": "eval и выпoлнeниe кoдa"},
-        "commands": ["py"],
+        "commands": ["py", "js", "rb", "go", "rs"],
     },
     "security": {
         "en": {
