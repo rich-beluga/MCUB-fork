@@ -635,16 +635,20 @@ class KernelCoreMixin:
         try:
             result = await self._cfg.save_module_config(module_name, config_data)
 
-            # Update live config schema
             live_cfg = self._live_module_configs.get(module_name)
-            if (
-                live_cfg
-                and hasattr(live_cfg, "_values")
-                and isinstance(config_data, dict)
-            ):
-                for key, value in config_data.items():
-                    if key != "__mcub_config__":
-                        live_cfg[key] = value
+            if live_cfg is not None:
+                if hasattr(live_cfg, "_values") and isinstance(config_data, dict):
+                    for key, value in config_data.items():
+                        if key != "__mcub_config__":
+                            live_cfg[key] = value
+            else:
+                live_mod = self.loaded_modules.get(
+                    module_name
+                ) or self.system_modules.get(module_name)
+                if live_mod is not None:
+                    module_config = getattr(live_mod, "config", None)
+                    if module_config is not None:
+                        self._live_module_configs[module_name] = module_config
 
             self.logger.debug(f"[Kernel] save_module_config result={result}")
             return result
@@ -658,6 +662,7 @@ class KernelCoreMixin:
 
     async def delete_module_config(self, module_name: str) -> bool:
         """Delete a module's config from the database."""
+        self._live_module_configs.pop(module_name, None)
         return await self._cfg.delete_module_config(module_name)
 
     async def get_module_config_key(

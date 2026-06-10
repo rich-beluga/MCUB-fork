@@ -830,6 +830,13 @@ def register(kernel):
             module_key = parts[1].strip() if len(parts) > 1 else None
 
             module_config = await kernel.get_module_config(module_name, None)
+            if module_config is None or (
+                isinstance(module_config, dict) and not module_config
+            ):
+                live_cfg = get_live_module_config(module_name)
+                if live_cfg is not None:
+                    module_config = live_cfg
+
             if module_config is None:
                 builder = event.builder.article(
                     title=f"Module: {module_name}",
