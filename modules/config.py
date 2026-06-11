@@ -2173,24 +2173,33 @@ def register(kernel):
                 hidden = key in SENSITIVE_KEYS or key in kernel.config.get(
                     "hidden_keys", []
                 )
-                if not hidden and is_module_scope and is_module_config:
-                    try:
-                        cv = target_config._values.get(key)
-                        if cv and (cv.hidden or getattr(cv.validator, "secret", False)):
-                            hidden = True
-                    except Exception:
-                        pass
+                if not hidden and is_module_scope:
+                    live_cfg = getattr(kernel, "_live_module_configs", {}).get(
+                        module_name
+                    )
+                    if live_cfg and hasattr(live_cfg, "_values"):
+                        try:
+                            cv = live_cfg._values.get(key)
+                            if cv and (
+                                getattr(cv, "hidden", False)
+                                or getattr(
+                                    getattr(cv, "validator", None), "secret", False
+                                )
+                            ):
+                                hidden = True
+                        except Exception:
+                            pass
                 saved = msg_manager.get_event(key_id) if key_id else None
                 if saved is not None:
                     try:
                         scope_label = module_name if is_module_scope else "kernel"
                         if hidden:
-                            safe = "—" * 6
+                            safe = "*" * len(key)
                             display_old = safe
                             display_new = safe
                         else:
-                            display_old = str(old_val)[:40]
-                            display_new = str(value)
+                            display_old = html.escape(str(old_val)[:40])
+                            display_new = html.escape(str(value))
                         await saved.edit(
                             t(
                                 "fcfg_module_update",
