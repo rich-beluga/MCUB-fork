@@ -1358,6 +1358,7 @@ config:
   fcfg_confirm_title: "✅ Confirm Value"
   fcfg_confirm_text: Value will be passed to config
   fcfg_confirm_success: "✅ Config key {key} updated to {value}"
+  fcfg_module_update: "✏️ Key <code>{key}</code> of module <code>{module}</code> <b>updated!</b>\n<blockquote><i>Was: {old}</i>\n<b>Now:</b> <code>{new}</code></blockquote>"
   fcfg_confirm_error: "❌ Error updating config: {error}"
   fcfg_confirm_expired: "❌ Confirmation expired or already used"
   key_deleted: "🗑️ Key deleted"

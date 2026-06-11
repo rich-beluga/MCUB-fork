@@ -1229,6 +1229,7 @@ config:
   fcfg_confirm_title: "✅ Confirm value"
   fcfg_confirm_text: "Value will be piped to /etc/mcubd.conf"
   fcfg_confirm_success: "✅ sysctl {key}={value} - done"
+  fcfg_module_update: "✏️ sysctl <code>{key}</code> for <code>{module}</code> updated!\n<blockquote><i>Was: {old}</i>\n<b>Now:</b> <code>{new}</code></blockquote>"
   fcfg_confirm_error: "❌ [STDERR]: error updating config: {error}"
   fcfg_confirm_expired: "❌ ETIMEDOUT: Confirmation expired or already used"
   key_deleted: "🗑️ unset - done"

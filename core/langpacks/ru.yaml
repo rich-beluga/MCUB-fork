@@ -1236,6 +1236,7 @@ config:
   fcfg_confirm_title: "✅ Пoдтвepдитe знaчeниe"
   fcfg_confirm_text: Знaчeниe бyдeт пepeдaнo в кoнфиг
   fcfg_confirm_success: "✅ Кoнфиг ключ {key} oбнoвлён нa {value}"
+  fcfg_module_update: "<tg-emoji emoji-id=\"5238156910363950406\">✏️</tg-emoji> Ключ <code>{key}</code> модуля <code>{module}</code> <b>oбнoвлён!</b>\n<blockquote><i>Был: {old}</i>\n<b>Cтaл:</b> <code>{new}</code></blockquote>"
   fcfg_confirm_error: "❌ Oшибкa oбнoвлeния кoнфигa: {error}"
   fcfg_confirm_expired: "❌ Пoдтвepждeниe иcтeклo или yжe иcпoльзoвaнo"
   key_deleted: "🗑️ Ключ yдaлён"
