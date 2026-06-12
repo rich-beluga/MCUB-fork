@@ -1024,6 +1024,74 @@ class ModuleBase(ABC):
                 text, query=query, same_peer=same_peer, style=style, icon=icon
             )
 
+        def input(
+            self,
+            text: str,
+            handler: Callable,
+            *,
+            placeholder: str = "",
+            ttl: int = 900,
+            allow_user: int | list[int] | str | None = None,
+            allow_ttl: int = 100,
+            article: Callable | None = None,
+            data: Any | None = None,
+            icon: int | None = None,
+            style: Any = None,
+        ) -> Any:
+            """Create an "input" button.
+
+            Tapping the button opens the bot's inline mode in the current
+            chat (``same_peer=True``). The user types whatever they want and
+            sends the offered result; the typed text is then delivered to
+            ``handler`` as ``(event, text, data)``, similar to
+            :meth:`ModuleBase.inline_temp`.
+
+            Args:
+                text: Button label.
+                handler: Async callable invoked with ``(event, typed_text,
+                    data)`` (or fewer args, based on its signature) once the
+                    user submits the inline result.
+                placeholder: Optional default text pre-filled in the inline
+                    query, which the user can edit before sending.
+                ttl: How long (seconds) the input handler stays registered.
+                allow_user: User ID, list of IDs, or "all" allowed to submit.
+                    Defaults to the user who pressed the button.
+                allow_ttl: TTL (seconds) for the permission grant.
+                article: Optional callable returning a custom article builder
+                    shown while the user types.
+                data: Optional arbitrary data passed through to ``handler``.
+                icon, style: Passed through to the underlying Telethon button.
+
+            Returns:
+                A ``KeyboardButtonSwitchInline`` button (``same_peer=True``).
+            """
+            user_module = self._outer._get_user_module()
+            if user_module and not hasattr(user_module, "register"):
+                user_module.register = type("RegisterObject", (), {})()
+
+            async def bound_wrapper(
+                event: Event, args: str, cb_data: Any = None
+            ) -> None:
+                _pe = wrap_event_for_module(event, self._outer.name, self._outer.kernel)
+                return await handler(_pe, args, cb_data)
+
+            bound_wrapper.__original__ = handler
+            bound_wrapper.__bound_instance__ = self._outer
+
+            temp_uuid = self._outer.kernel.register.inline_temp(
+                bound_wrapper,
+                ttl=ttl,
+                article=article,
+                data=data,
+                allow_user=allow_user,
+                allow_ttl=allow_ttl,
+            )
+
+            query = f"{temp_uuid} {placeholder}" if placeholder else f"{temp_uuid} "
+            return self._telethon_button.switch_inline(
+                text, query=query, same_peer=True, style=style, icon=icon
+            )
+
         def copy(
             self,
             text: str = "Copy",
@@ -1279,7 +1347,7 @@ class ModuleBase(ABC):
             if name.endswith(".py"):
                 name = name[:-3]
             elif not name:
-                name = "xlib"
+                return None
 
         try:
             valid, error = validate_remote_url(url)
