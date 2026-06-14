@@ -340,6 +340,11 @@ class InlineBot:
             self.logger.error("[InlineBot] auto setup requires kernel")
             return
 
+        from core.langpacks import get_module_strings
+
+        locale = self.kernel.config.get("language", "ru")
+        s = get_module_strings("core_inline", locale)
+
         Y = self.kernel.Colors.YELLOW
         R = self.kernel.Colors.RED
         RST = self.kernel.Colors.RESET
@@ -361,29 +366,14 @@ class InlineBot:
                 limit_hit_count += 1
 
                 if limit_hit_count >= 3:
-                    # User was warned twice and still didn't delete - bail out.
-                    print(
-                        f"\n{R}Всё, я устал. "
-                        "Сам разбирайся с ботами."
-                        f"{RST}\n"
-                    )
+                    print(f"\n{R}{s.get('bot_limit_give_up', '')}{RST}\n")
                     return
 
-                if limit_hit_count == 1:
-                    print(
-                        f"\n{Y}Далбаеб а ну ка удали лишнего бота, "
-                        f"я не могу настроить твой мкуб{RST}"
-                    )
-                else:
-                    # 2nd hit - final warning before we give up next time.
-                    print(
-                        f"\n{Y}Ты не удалил бота далбаебик, "
-                        "если еще раз такое повториться я не буду тебе помогать."
-                        f"{RST}"
-                    )
+                msg_key = "bot_limit_warn1" if limit_hit_count == 1 else "bot_limit_warn2"
+                print(f"\n{Y}{s.get(msg_key, '')}{RST}")
 
                 choice = (
-                    input(f"{Y}Удалил? [Y/n]: {RST}")
+                    input(f"{Y}{s.get('bot_limit_prompt', '[Y/n]: ')}{RST}")
                     .strip()
                     .lower()
                 )
