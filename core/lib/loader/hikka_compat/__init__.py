@@ -17,6 +17,7 @@ from .decorators import (
     tag,
     tds,
     watcher,
+    placeholder,
 )
 from .fake_package import (
     _detect_module_type,

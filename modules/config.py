@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import html
+import traceback
 
 # author: @Hairpin00
 # version: 1.3.0
@@ -95,43 +96,18 @@ TYPE_EMOJIS = {
 
 
 class InlineMessageManager:
+
     def __init__(self, kernel):
-        self.kernel = kernel
-        self.messages = {}  # {inline_msg_id: (chat_id, message_id, key_id, user_id)}
+        self._events: dict[str, Any] = {}
 
-    def save_message(self, inline_msg_id, chat_id, message_id, key_id, user_id):
-        self.messages[inline_msg_id] = {
-            "chat_id": chat_id,
-            "message_id": message_id,
-            "key_id": key_id,
-            "user_id": user_id,
-            "timestamp": time.time(),
-        }
-        asyncio.create_task(self.save_to_db())
+    def save_event(self, key_id: str, event) -> None:
+        self._events[key_id] = event
 
-    async def save_to_db(self):
-        try:
-            await self.kernel.db_set(
-                "cfg_messages", "inline_messages", json.dumps(self.messages)
-            )
-        except Exception as e:
-            self.kernel.logger.debug(f"Error saving inline messages: {e}")
+    def get_event(self, key_id: str):
+        return self._events.pop(key_id, None)
 
-    async def load_from_db(self):
-        try:
-            data = await self.kernel.db_get("cfg_messages", "inline_messages")
-            if data:
-                self.messages = json.loads(data)
-        except Exception as e:
-            self.kernel.logger.debug(f"Error loading inline messages: {e}")
-
-    def get_message_info(self, inline_msg_id):
-        return self.messages.get(inline_msg_id)
-
-    def remove_message(self, inline_msg_id):
-        if inline_msg_id in self.messages:
-            del self.messages[inline_msg_id]
-            asyncio.create_task(self.save_to_db())
+    def remove_event(self, key_id: str) -> None:
+        self._events.pop(key_id, None)
 
 
 async def init_module_config(kernel):
@@ -357,7 +333,6 @@ def register(kernel):
     SENSITIVE_KEYS = ["inline_bot_token", "api_id", "api_hash", "phone"]
 
     msg_manager = InlineMessageManager(kernel)
-    asyncio.create_task(msg_manager.load_from_db())
 
     class CustomJSONEncoder(json.JSONEncoder):
         def encode(self, o):
@@ -711,7 +686,9 @@ def register(kernel):
                         ]
                     )
                 else:
-                    if not is_key_hidden(key) or key not in SENSITIVE_KEYS:
+                    if value_type != "dict" and (
+                        not is_key_hidden(key) or key not in SENSITIVE_KEYS
+                    ):
                         buttons.append(
                             [
                                 Button.switch_inline(
@@ -830,6 +807,13 @@ def register(kernel):
             module_key = parts[1].strip() if len(parts) > 1 else None
 
             module_config = await kernel.get_module_config(module_name, None)
+            if module_config is None or (
+                isinstance(module_config, dict) and not module_config
+            ):
+                live_cfg = get_live_module_config(module_name)
+                if live_cfg is not None:
+                    module_config = live_cfg
+
             if module_config is None:
                 builder = event.builder.article(
                     title=f"Module: {module_name}",
@@ -1311,8 +1295,13 @@ def register(kernel):
                     ]
                 )
             else:
-                # Edit button for non-bool values (if not hidden/secret and no choices)
-                if not is_hidden and not is_secret and not choices:
+                # Edit button for non-bool, non-dict values (if not hidden/secret and no choices)
+                if (
+                    not is_hidden
+                    and not is_secret
+                    and not choices
+                    and value_type != "dict"
+                ):
                     # Create key_id for inline editing
                     key_id = generate_key_id(
                         f"{module_name}__{key}", page, "module_cfg"
@@ -2056,8 +2045,13 @@ def register(kernel):
             def set_value(cfg_key, cfg_value):
                 target_config[cfg_key] = cfg_value
 
+            old_val = ""
+            new_val = ""
+
             if action == "set":
                 value = confirm_data["value"]
+                old_val = get_value(key) if has_key(key) else target_config.get(key, "")
+                new_val = value
                 set_value(key, value)
                 success = True
                 message = t(
@@ -2071,6 +2065,7 @@ def register(kernel):
                     current_list.append(value)
                     set_value(key, current_list)
                     success = True
+                    new_val = value
                     message = t("list_add_confirm", value=html.escape(str(value)))
                 else:
                     message = f"❌ Ключ {key} нe являeтcя cпиcкoм"
@@ -2083,6 +2078,7 @@ def register(kernel):
                         removed = current_list.pop(index)
                         set_value(key, current_list)
                         success = True
+                        old_val = removed
                         message = t(
                             "list_remove_confirm",
                             index=index,
@@ -2103,6 +2099,8 @@ def register(kernel):
                         current_list[index] = value
                         set_value(key, current_list)
                         success = True
+                        old_val = old_value
+                        new_val = value
                         message = t(
                             "list_set_confirm",
                             index=index,
@@ -2122,6 +2120,7 @@ def register(kernel):
                     current_dict[subkey] = value
                     set_value(key, current_dict)
                     success = True
+                    new_val = f"{subkey}: {value}"
                     message = t(
                         "dict_add_confirm", key=subkey, value=html.escape(str(value))
                     )
@@ -2133,9 +2132,10 @@ def register(kernel):
                 if has_key(key) and isinstance(get_value(key), dict):
                     current_dict = dict(get_value(key))
                     if subkey in current_dict:
-                        current_dict.pop(subkey)
+                        removed_value = current_dict.pop(subkey)
                         set_value(key, current_dict)
                         success = True
+                        old_val = f"{subkey}: {removed_value}"
                         message = t("dict_remove_confirm", key=subkey)
                     else:
                         message = f"❌ Ключ {subkey} нe нaйдeн в cлoвape"
@@ -2152,6 +2152,8 @@ def register(kernel):
                         current_dict[subkey] = value
                         set_value(key, current_dict)
                         success = True
+                        old_val = f"{subkey}: {old_value}"
+                        new_val = f"{subkey}: {value}"
                         message = t(
                             "dict_set_confirm",
                             key=subkey,
@@ -2188,38 +2190,66 @@ def register(kernel):
 
                 kernel.cache.set(cache_key, None, ttl=1)
 
-                try:
-                    if hasattr(event, "query") and hasattr(
-                        event.query, "inline_message_id"
-                    ):
-                        inline_msg_id = event.query.inline_message_id
-
-                        if is_module_scope:
-                            if has_key(key):
-                                new_text = format_key_value(
-                                    key, get_value(key), reveal=True
+                hidden = key in SENSITIVE_KEYS or key in kernel.config.get(
+                    "hidden_keys", []
+                )
+                if not hidden and is_module_scope:
+                    live_cfg = getattr(kernel, "_live_module_configs", {}).get(
+                        module_name
+                    )
+                    if live_cfg and hasattr(live_cfg, "_values"):
+                        try:
+                            cv = live_cfg._values.get(key)
+                            if cv and (
+                                getattr(cv, "hidden", False)
+                                or getattr(
+                                    getattr(cv, "validator", None), "secret", False
                                 )
-                            else:
-                                new_text = message
+                            ):
+                                hidden = True
+                        except Exception:
+                            pass
+                saved = msg_manager.get_event(key_id) if key_id else None
+                if saved is not None:
+                    try:
+                        scope_label = module_name if is_module_scope else "kernel"
+                        if hidden:
+                            safe = "*" * len(key)
+                            display_old = safe
+                            display_new = safe
                         else:
-                            if is_key_hidden(key):
-                                new_text = t("value_inserted")
-                            else:
-                                new_text = format_key_value(
-                                    key, kernel.config[key], reveal=True
-                                )
-
-                        if kernel.is_bot_available():
-                            await kernel.bot_client.edit_message(
-                                inline_message_id=inline_msg_id,
-                                text=new_text,
-                                parse_mode="html",
+                            display_old = (
+                                html.escape(str(old_val)[:40]) if old_val != "" else "—"
                             )
+                            display_new = (
+                                html.escape(str(new_val)[:40]) if new_val != "" else "—"
+                            )
+                        await saved.edit(
+                            t(
+                                "fcfg_module_update",
+                                key=key,
+                                module=scope_label,
+                                old=display_old,
+                                new=display_new,
+                            ),
+                            buttons=[
+                                [
+                                    Button.inline(
+                                        "🔙",
+                                        data=(
+                                            f"module_cfg_view_{key_id}".encode()
+                                            if is_module_scope
+                                            else f"cfg_view_{key_id}".encode()
+                                        ),
+                                    )
+                                ]
+                            ],
+                            parse_mode="html",
+                        )
+                    except Exception as e:
+                        kernel.logger.debug(f"Failed to edit with saved event: {e}")
 
-                except Exception as e:
-                    kernel.logger.debug(f"Failed to edit inline message: {e}")
-
-                if kernel.is_bot_available():
+                if not saved and kernel.is_bot_available():
                     try:
                         await kernel.bot_client.send_message(
                             user_id, message, parse_mode="html"
@@ -2481,18 +2511,34 @@ def register(kernel):
                 [],
             )
 
-    async def config_callback_handler(event):
-        data = event.data.decode()
+    async def config_callback_handler(cb_event):
+        data = cb_event.data.decode()
 
         if data == "cfg_close":
             try:
-                await kernel.client.delete_messages(event.chat_id, [event.message_id])
+                peer = cb_event.input_chat
+                if peer:
+                    result = await kernel.client.delete_messages(
+                        peer, cb_event.message_id
+                    )
+                    affected = sum(r.pts_count for r in result)
+                    if affected == 0:
+                        kernel.logger.error(
+                            'delete config message "%s", "%s" failed!',
+                            cb_event.chat_id,
+                            cb_event.message_id,
+                        )
+                    kernel.logger.debug("Delete (pts_count=%s)", affected)
+                else:
+                    await cb_event.edit("❌ Closed")
             except Exception as e:
-                kernel.logger.debug(e)
-                try:
-                    await event.edit("❌ Closed")
-                except Exception:
-                    await event.answer("Closed", alert=False)
+                kernel.logger.error(
+                    "Error in config_callback_handler cfg_close:\n%s",
+                    traceback.format_exc(),
+                )
+                kernel.handle_error(
+                    e, message="Failed delete config message!", event=cb_event
+                )
             return
 
         if data.startswith("cfg_module_reset_"):
@@ -2500,7 +2546,7 @@ def register(kernel):
                 key_id = data[len("cfg_module_reset_") :]
                 cached = kernel.cache.get(f"module_cfg_reset_{key_id}")
                 if not cached:
-                    await event.answer(t("expired"), alert=True)
+                    await cb_event.answer(t("expired"), alert=True)
                     return
 
                 module_name, key, page = cached
@@ -2523,14 +2569,14 @@ def register(kernel):
                             module_name, live_config.to_dict()
                         )
                         kernel.store_module_config_schema(module_name, live_config)
-                        await show_module_key_view(event, module_name, key, page)
-                        await event.answer(t("reset_success"), alert=True)
+                        await show_module_key_view(cb_event, module_name, key, page)
+                        await cb_event.answer(t("reset_success"), alert=True)
                     else:
-                        await event.answer(t("no_default"), alert=True)
+                        await cb_event.answer(t("no_default"), alert=True)
                 else:
-                    await event.answer(t("not_module_config"), alert=True)
+                    await cb_event.answer(t("not_module_config"), alert=True)
             except Exception as e:
-                await event.answer(t("error", error=str(e)[:50]), alert=True)
+                await cb_event.answer(t("error", error=str(e)[:50]), alert=True)
             return
 
         if data == "config_menu":
@@ -2554,16 +2600,16 @@ def register(kernel):
                 [Button.inline("❌ Close", data=b"cfg_close", style="danger")],
             ]
             try:
-                await event.edit(text, buttons=buttons, parse_mode="html")
+                await cb_event.edit(text, buttons=buttons, parse_mode="html")
             except Exception as e:
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
         elif data.startswith("config_kernel_page_"):
             try:
                 page = int(data.split("_")[3])
-                await config_kernel_page(event, page)
+                await config_kernel_page(cb_event, page)
             except Exception as e:
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
         elif data.startswith("config_modules_filter_"):
             try:
@@ -2596,9 +2642,9 @@ def register(kernel):
                 buttons = create_modules_buttons_grid(
                     page_modules, page, total_pages, filter_val
                 )
-                await event.edit(text, buttons=buttons, parse_mode="html")
+                await cb_event.edit(text, buttons=buttons, parse_mode="html")
             except Exception as e:
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
         elif data.startswith("config_modules_page_"):
             try:
@@ -2637,22 +2683,22 @@ def register(kernel):
                 buttons = create_modules_buttons_grid(
                     page_modules, page, total_pages, filter_val
                 )
-                await event.edit(text, buttons=buttons, parse_mode="html")
+                await cb_event.edit(text, buttons=buttons, parse_mode="html")
             except Exception as e:
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
         elif data.startswith("module_select_"):
             try:
                 key_id = data[14:]
                 cached = kernel.cache.get(f"module_select_{key_id}")
                 if not cached:
-                    await event.answer(t("expired"), alert=True)
+                    await cb_event.answer(t("expired"), alert=True)
                     return
 
                 module_name, page = cached
-                await show_module_config_view(event, module_name, 0)
+                await show_module_config_view(cb_event, module_name, 0)
             except Exception as e:
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
         elif data.startswith("module_cfg_page_"):
             try:
@@ -2661,7 +2707,7 @@ def register(kernel):
                     nav_id = data[20:]
                     cached = kernel.cache.get(f"module_nav_{nav_id}")
                     if not cached:
-                        await event.answer(t("expired"), alert=True)
+                        await cb_event.answer(t("expired"), alert=True)
                         return
                     module_name, page = cached
                 elif "__" in data:
@@ -2676,25 +2722,26 @@ def register(kernel):
                         page = int(page_part)
                         module_name = "_".join(parts[3:-1])
                     else:
-                        await event.answer(t("invalid_format"), alert=True)
+                        await cb_event.answer(t("invalid_format"), alert=True)
                         return
 
-                await show_module_config_view(event, module_name, page)
+                await show_module_config_view(cb_event, module_name, page)
             except Exception as e:
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
         elif data.startswith("module_cfg_view_"):
             try:
                 key_id = data[16:]
                 cached = kernel.cache.get(f"module_cfg_view_{key_id}")
                 if not cached:
-                    await event.answer(t("expired"), alert=True)
+                    await cb_event.answer(t("expired"), alert=True)
                     return
 
                 module_name, key, page = cached
-                await show_module_key_view(event, module_name, key, page)
+                msg_manager.save_event(key_id, cb_event)
+                await show_module_key_view(cb_event, module_name, key, page)
             except Exception as e:
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
         elif data.startswith("cfg_modules_bool_"):
             try:
@@ -2711,15 +2758,15 @@ def register(kernel):
                         key = parts[1]
                         page = int(parts[2])
                     else:
-                        await event.answer(t("invalid_format"), alert=True)
+                        await cb_event.answer(t("invalid_format"), alert=True)
                         return
                 else:
-                    await event.answer(t("expired"), alert=True)
+                    await cb_event.answer(t("expired"), alert=True)
                     return
 
-                await toggle_module_bool_key(event, module_name, key, page)
+                await toggle_module_bool_key(cb_event, module_name, key, page)
             except Exception as e:
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
         elif data.startswith("cfg_module_choice_"):
             try:
@@ -2729,7 +2776,7 @@ def register(kernel):
                 idx = rest.rfind("-")
                 kernel.logger.debug(f"DEBUG choice: idx={idx}")
                 if idx == -1:
-                    await event.answer(t("invalid_format"), alert=True)
+                    await cb_event.answer(t("invalid_format"), alert=True)
                     return
                 choice_id = rest[:idx]
                 if choice_id.startswith("_"):
@@ -2741,14 +2788,14 @@ def register(kernel):
                 cached = kernel.cache.get(f"module_choice_{choice_id}")
                 kernel.logger.debug(f"DEBUG choice: cached={cached is not None}")
                 if not cached:
-                    await event.answer(t("expired"), alert=True)
+                    await cb_event.answer(t("expired"), alert=True)
                     return
                 module_name, key, page, choices = cached
                 kernel.logger.debug(
                     f"Choice selected: {module_name}, {key}={choices[choice_idx]}, choices={choices}"
                 )
                 if choice_idx >= len(choices):
-                    await event.answer(t("invalid_format"), alert=True)
+                    await cb_event.answer(t("invalid_format"), alert=True)
                     return
                 new_value = choices[choice_idx]
                 module_config = await kernel.get_module_config(module_name, {})
@@ -2764,33 +2811,23 @@ def register(kernel):
                         else module_config.to_dict()
                     ),
                 )
-                await event.answer(t("changed_to", value=new_value), alert=False)
-                await show_module_key_view(event, module_name, key, page)
+                await cb_event.answer(t("changed_to", value=new_value), alert=False)
+                await show_module_key_view(cb_event, module_name, key, page)
             except Exception as e:
                 import traceback
 
                 kernel.logger.debug(f"Choice error: {e}\n{traceback.format_exc()}")
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
         elif data.startswith("cfg_view_"):
             try:
                 key_id = data[9:]
-                result = await show_key_view(event, key_id, reveal=False)
+                result = await show_key_view(cb_event, key_id, reveal=False)
                 if result[0] is None:
                     return
                 text, key, page, config_type, key_id = result
 
-                if (
-                    hasattr(event.query, "inline_message_id")
-                    and event.query.inline_message_id
-                ):
-                    msg_manager.save_message(
-                        inline_msg_id=event.query.inline_message_id,
-                        chat_id=event.chat_id,
-                        message_id=event.id,
-                        key_id=key_id,
-                        user_id=event.sender.id,
-                    )
+                msg_manager.save_event(key_id, cb_event)
 
                 buttons = []
 
@@ -2811,7 +2848,9 @@ def register(kernel):
                         ]
                     )
                 else:
-                    if not is_key_hidden(key) or key not in SENSITIVE_KEYS:
+                    if value_type != "dict" and (
+                        not is_key_hidden(key) or key not in SENSITIVE_KEYS
+                    ):
                         buttons.append(
                             [
                                 Button.switch_inline(
@@ -2921,32 +2960,32 @@ def register(kernel):
                     [Button.inline("❌ Close", data=b"cfg_close", style="danger")]
                 )
 
-                await event.edit(text, buttons=buttons, parse_mode="html")
+                await cb_event.edit(text, buttons=buttons, parse_mode="html")
             except Exception as e:
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
         elif data.startswith("cfg_bool_toggle_"):
             try:
                 key_id = data[16:]
                 cached = kernel.cache.get(f"cfg_view_{key_id}")
                 if not cached:
-                    await event.answer(t("expired"), alert=True)
+                    await cb_event.answer(t("expired"), alert=True)
                     return
 
                 key, page, config_type = cached
                 if key not in kernel.config:
-                    await event.answer(t("not_found"), alert=True)
+                    await cb_event.answer(t("not_found"), alert=True)
                     return
 
                 value = kernel.config[key]
                 if not isinstance(value, bool):
-                    await event.answer(t("not_boolean"), alert=True)
+                    await cb_event.answer(t("not_boolean"), alert=True)
                     return
 
                 kernel.config[key] = not value
                 await save_config()
 
-                result = await show_key_view(event, key_id, reveal=False)
+                result = await show_key_view(cb_event, key_id, reveal=False)
                 if result[0] is None:
                     return
                 text, key, page, config_type, key_id = result
@@ -2978,42 +3017,42 @@ def register(kernel):
                     ],
                 ]
 
-                await event.edit(text, buttons=buttons, parse_mode="html")
-                await event.answer(t("changed_to", value=new_value), alert=False)
+                await cb_event.edit(text, buttons=buttons, parse_mode="html")
+                await cb_event.answer(t("changed_to", value=new_value), alert=False)
             except Exception as e:
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
         elif data.startswith("cfg_delete_"):
             try:
                 key_id = data[11:]
                 cached = kernel.cache.get(f"cfg_view_{key_id}")
                 if not cached:
-                    await event.answer(t("expired"), alert=True)
+                    await cb_event.answer(t("expired"), alert=True)
                     return
 
                 key, page, config_type = cached
 
                 if key in SENSITIVE_KEYS:
-                    await event.answer(t("fcfg_inline_protected"), alert=True)
+                    await cb_event.answer(t("fcfg_inline_protected"), alert=True)
                     return
 
                 if key in kernel.config:
                     kernel.config.pop(key)
                     await save_config()
-                    await event.answer(t("key_deleted"), alert=True)
+                    await cb_event.answer(t("key_deleted"), alert=True)
 
-                    await config_kernel_page(event, page)
+                    await config_kernel_page(cb_event, page)
                 else:
-                    await event.answer(t("not_found"), alert=True)
+                    await cb_event.answer(t("not_found"), alert=True)
 
             except Exception as e:
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
         elif data.startswith("cfg_reveal_"):
             try:
                 key_id = data[11:]
                 # Show value without masking
-                result = await show_key_view(event, key_id, reveal=True)
+                result = await show_key_view(cb_event, key_id, reveal=True)
                 if result[0] is None:
                     return
                 text, key, page, config_type, key_id = result
@@ -3038,7 +3077,9 @@ def register(kernel):
                             )
                         ]
                     )
-                elif not is_key_hidden(key) or key not in SENSITIVE_KEYS:
+                elif value_type != "dict" and (
+                    not is_key_hidden(key) or key not in SENSITIVE_KEYS
+                ):
                     buttons.append(
                         [
                             Button.switch_inline(
@@ -3135,18 +3176,18 @@ def register(kernel):
                     [Button.inline("❌ Close", data=b"cfg_close", style="danger")]
                 )
 
-                await event.edit(text, buttons=buttons, parse_mode="html")
-                await event.answer("👁️ Знaчeниe pacкpытo", alert=False)
+                await cb_event.edit(text, buttons=buttons, parse_mode="html")
+                await cb_event.answer("👁️ Знaчeниe pacкpытo", alert=False)
 
             except Exception as e:
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
         elif data.startswith("cfg_module_reveal_"):
             try:
                 key_id = data[18:]
                 cached = kernel.cache.get(f"module_cfg_view_{key_id}")
                 if not cached:
-                    await event.answer(t("expired"), alert=True)
+                    await cb_event.answer(t("expired"), alert=True)
                     return
 
                 module_name, key, page = cached
@@ -3159,12 +3200,12 @@ def register(kernel):
 
                 if is_new_format:
                     if key not in module_config.keys():
-                        await event.answer(t("not_found"), alert=True)
+                        await cb_event.answer(t("not_found"), alert=True)
                         return
                     value = module_config[key]
                 else:
                     if key not in module_config:
-                        await event.answer(t("not_found"), alert=True)
+                        await cb_event.answer(t("not_found"), alert=True)
                         return
                     value = module_config[key]
 
@@ -3212,7 +3253,7 @@ def register(kernel):
                             )
                         ]
                     )
-                else:
+                elif value_type != "dict":
                     # Edit button
                     buttons.append(
                         [
@@ -3306,11 +3347,11 @@ def register(kernel):
                     [Button.inline("❌ Close", data=b"cfg_close", style="danger")]
                 )
 
-                await event.edit(text, buttons=buttons, parse_mode="html")
-                await event.answer("👁️ Знaчeниe pacкpытo", alert=False)
+                await cb_event.edit(text, buttons=buttons, parse_mode="html")
+                await cb_event.answer("👁️ Знaчeниe pacкpытo", alert=False)
 
             except Exception as e:
-                await event.answer(str(e)[:50], alert=True)
+                await cb_event.answer(str(e)[:50], alert=True)
 
     @kernel.register.command(
         "cfg",

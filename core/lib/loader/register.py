@@ -5,13 +5,17 @@
 # version: 1.0.3
 # description: Registration system for Telegram bot handlers
 
+from __future__ import annotations
+
 import asyncio
 import inspect
 import re
 import time
 import uuid
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from core.lib.types.event import Event
 
 try:
     from telethon import events
@@ -23,8 +27,12 @@ try:
     from core.lib.loader.kernel_proxy import wrap_event_for_module
 except ImportError:
 
-    def wrap_event_for_module(e, *a, **kw):
+    def wrap_event_for_module(e: Any, *a: Any, **kw: Any) -> Any:
         return e
+
+
+if TYPE_CHECKING:
+    from core.lib.types import Kernel, Message
 
 
 try:
@@ -58,7 +66,7 @@ class InfiniteLoop:
         self.autostart = autostart
         self._wait_before = wait_before
         self._task: asyncio.Task | None = None
-        self._kernel: Any = None
+        self._kernel: Kernel | None = None
         self.status: bool = False
         self.last_run: float | None = None
         self.last_error: Exception | None = None
@@ -127,7 +135,7 @@ class InfiniteLoop:
         )
 
 
-def _watcher_passes_filters(event: Any, tags: dict[str, Any]) -> bool:
+def _watcher_passes_filters(event: Event, tags: dict[str, Any]) -> bool:
     """Return True if *event* satisfies all tag filters."""
     msg = getattr(event, "message", event)
 
@@ -242,7 +250,7 @@ class Register:
     # Soft cap - modules with more loops get a warning; loop still works.
     MAX_LOOPS_PER_MODULE = 5
 
-    def __init__(self, kernel: Any) -> None:
+    def __init__(self, kernel: Kernel) -> None:
         self.kernel = kernel
         self._methods: dict[str, Callable] = {}
         self._method_modules: dict[str, Any] = {}
@@ -737,7 +745,7 @@ class Register:
             bound_instance = getattr(f, "__bound_instance__", None)
             raw_func = getattr(f, "__original__", f)
 
-            async def _wrapper(event: Any) -> None:
+            async def _wrapper(event: Event) -> None:
                 event_text = getattr(getattr(event, "message", event), "text", None)
                 self.kernel.logger.debug(
                     "[watcher] enter module=%r watcher=%r chat_id=%r sender_id=%r text=%r",
@@ -917,7 +925,7 @@ class Register:
             >>>     checker.stop()
         """
 
-        def decorator(f: Callable) -> "InfiniteLoop":
+        def decorator(f: Callable) -> InfiniteLoop:
             nonlocal module
             bound_instance = getattr(f, "__bound_instance__", None)
             raw_func = getattr(f, "__original__", f)
@@ -1062,6 +1070,36 @@ class Register:
         """
         return self.kernel.bot_command_handlers.copy()
 
+    def _watcher_info_from_entry(
+        self, entry: tuple, module_name: str, disabled: set
+    ) -> dict[str, Any]:
+        wrapper, event_obj = entry[0], entry[1]
+        client = entry[2] if len(entry) > 2 else self.kernel.client
+        meta = entry[3] if len(entry) > 3 and isinstance(entry[3], dict) else {}
+        watcher_module = meta.get(
+            "module",
+            getattr(wrapper, "__watcher_module__", module_name),
+        )
+        watcher_name = meta.get(
+            "method",
+            getattr(
+                wrapper,
+                "__watcher_name__",
+                getattr(wrapper, "__name__", "unknown"),
+            ),
+        )
+        watcher_key = self._watcher_key(watcher_module, watcher_name)
+        return {
+            "module": watcher_module,
+            "method": watcher_name,
+            "enabled": watcher_key not in disabled,
+            "tags": dict(meta.get("tags", {})),
+            "bot_client": bool(meta.get("bot_client", False)),
+            "wrapper": wrapper,
+            "event": event_obj,
+            "client": client,
+        }
+
     def get_watchers(self) -> list[dict[str, Any]]:
         """
         Get all registered watchers from all modules.
@@ -1079,71 +1117,13 @@ class Register:
             if reg is self:
                 if hasattr(self, "_all_watchers"):
                     for entry in self._all_watchers:
-                        wrapper, event_obj = entry[0], entry[1]
-                        client = entry[2] if len(entry) > 2 else self.kernel.client
-                        meta = (
-                            entry[3]
-                            if len(entry) > 3 and isinstance(entry[3], dict)
-                            else {}
-                        )
-                        watcher_module = meta.get(
-                            "module",
-                            getattr(wrapper, "__watcher_module__", module_name),
-                        )
-                        watcher_name = meta.get(
-                            "method",
-                            getattr(
-                                wrapper,
-                                "__watcher_name__",
-                                getattr(wrapper, "__name__", "unknown"),
-                            ),
-                        )
-                        watcher_key = self._watcher_key(watcher_module, watcher_name)
                         watchers.append(
-                            {
-                                "module": watcher_module,
-                                "method": watcher_name,
-                                "enabled": watcher_key not in disabled,
-                                "tags": dict(meta.get("tags", {})),
-                                "bot_client": bool(meta.get("bot_client", False)),
-                                "wrapper": wrapper,
-                                "event": event_obj,
-                                "client": client,
-                            }
+                            self._watcher_info_from_entry(entry, module_name, disabled)
                         )
             elif reg and hasattr(reg, "_all_watchers"):
                 for entry in reg._all_watchers:
-                    wrapper, event_obj = entry[0], entry[1]
-                    client = entry[2] if len(entry) > 2 else self.kernel.client
-                    meta = (
-                        entry[3]
-                        if len(entry) > 3 and isinstance(entry[3], dict)
-                        else {}
-                    )
-                    watcher_module = meta.get(
-                        "module",
-                        getattr(wrapper, "__watcher_module__", module_name),
-                    )
-                    watcher_name = meta.get(
-                        "method",
-                        getattr(
-                            wrapper,
-                            "__watcher_name__",
-                            getattr(wrapper, "__name__", "unknown"),
-                        ),
-                    )
-                    watcher_key = self._watcher_key(watcher_module, watcher_name)
                     watchers.append(
-                        {
-                            "module": watcher_module,
-                            "method": watcher_name,
-                            "enabled": watcher_key not in disabled,
-                            "tags": dict(meta.get("tags", {})),
-                            "bot_client": bool(meta.get("bot_client", False)),
-                            "wrapper": wrapper,
-                            "event": event_obj,
-                            "client": client,
-                        }
+                        self._watcher_info_from_entry(entry, module_name, disabled)
                     )
             elif reg and hasattr(reg, "__watchers__"):
                 for entry in reg.__watchers__:
@@ -1442,7 +1422,7 @@ class Register:
             "data": data,
             "expires_at": now + ttl if ttl else None,
             "module_name": module_name,
-            "allow_user": None,
+            "allow_user": allow_user,
             "allow_ttl": allow_ttl,
         }
         self.kernel._inline_temp_uuids.append(temp_uuid)
@@ -1497,7 +1477,7 @@ class Register:
         reply_to: int | None = None,
         *,
         prefix: str | None = None,
-        original_event: Any = None,
+        original_event: Event | None = None,
     ) -> Any:
         """Execute a registered command in a specified chat.
 
@@ -1549,9 +1529,9 @@ class Register:
 
     def message_proxy(
         self,
-        msg: Any,
-        original_event: Any = None,
-    ) -> "_MessageEventProxy":
+        msg: Message,
+        original_event: Event | None = None,
+    ) -> _MessageEventProxy:
         """Wrap a raw Telegram ``Message`` as an event-like proxy.
 
         The returned object quacks like a userbot event and can be fed to

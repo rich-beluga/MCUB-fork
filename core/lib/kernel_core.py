@@ -13,6 +13,8 @@ import sys
 import time
 from typing import Any
 
+from core.lib.types.event import Event
+
 # McubTelethonError (graceful fallback)───────
 try:
     from core.lib.utils.exceptions import McubTelethonError
@@ -289,6 +291,15 @@ class KernelCoreMixin:
             self._warn("Register", e)
             self.register = None
 
+        # Dispatcher
+        try:
+            from core.lib.loader.dispatcher import CommandDispatcher
+
+            self.dispatcher = CommandDispatcher(self) if CommandDispatcher else None
+        except Exception as e:
+            self._warn("CommandDispatcher", e)
+            self.dispatcher = None
+
         # Callback permissions
         try:
             self.callback_permissions = (
@@ -564,18 +575,18 @@ class KernelCoreMixin:
         self.logger.debug(f"[Kernel] is_admin user_id={user_id} result={result}")
         return result
 
-    def should_process_command_event(self, event: Any) -> bool:
+    def should_process_command_event(self, event: Event) -> bool:
         """Accept own command messages even when Telethon loses the out flag."""
         msg = getattr(event, "message", event)
         if getattr(msg, "out", False):
             return True
         return self.is_admin(getattr(event, "sender_id", None))
 
-    def _is_command_event_processed(self, event: Any) -> bool:
+    def _is_command_event_processed(self, event: Event) -> bool:
         msg = getattr(event, "message", event)
         return bool(getattr(msg, "_mcub_command_processed", False))
 
-    def _mark_command_event_processed(self, event: Any) -> None:
+    def _mark_command_event_processed(self, event: Event) -> None:
         msg = getattr(event, "message", event)
         msg._mcub_command_processed = True
 
@@ -624,16 +635,20 @@ class KernelCoreMixin:
         try:
             result = await self._cfg.save_module_config(module_name, config_data)
 
-            # Update live config schema
             live_cfg = self._live_module_configs.get(module_name)
-            if (
-                live_cfg
-                and hasattr(live_cfg, "_values")
-                and isinstance(config_data, dict)
-            ):
-                for key, value in config_data.items():
-                    if key != "__mcub_config__":
-                        live_cfg[key] = value
+            if live_cfg is not None:
+                if hasattr(live_cfg, "_values") and isinstance(config_data, dict):
+                    for key, value in config_data.items():
+                        if key != "__mcub_config__":
+                            live_cfg[key] = value
+            else:
+                live_mod = self.loaded_modules.get(
+                    module_name
+                ) or self.system_modules.get(module_name)
+                if live_mod is not None:
+                    module_config = getattr(live_mod, "config", None)
+                    if module_config is not None:
+                        self._live_module_configs[module_name] = module_config
 
             self.logger.debug(f"[Kernel] save_module_config result={result}")
             return result
@@ -647,6 +662,7 @@ class KernelCoreMixin:
 
     async def delete_module_config(self, module_name: str) -> bool:
         """Delete a module's config from the database."""
+        self._live_module_configs.pop(module_name, None)
         return await self._cfg.delete_module_config(module_name)
 
     async def get_module_config_key(
@@ -694,7 +710,7 @@ class KernelCoreMixin:
         error: Exception,
         source: str = "unknown",
         message: str | None = None,
-        event: Any = None,
+        event: Event | None = None,
     ) -> None:
         """Log an error to file and send a report to the log chat."""
         await self._log.handle_error(error, source, message=message, event=event)
@@ -907,7 +923,7 @@ class KernelCoreMixin:
                 self.client.add_request_middleware(middleware_func)
                 self._request_middleware_ids.add(middleware_id)
 
-    def _set_event_text(self, event: Any, text: str) -> None:
+    def _set_event_text(self, event: Event, text: str) -> None:
         """Set event text on both the event and its inner message object."""
         event.text = text
         if hasattr(event, "message"):
@@ -971,6 +987,11 @@ class KernelCoreMixin:
     async def restart(self, chat_id=None, message_id=None) -> None:
         """Restart the userbot process, optionally notifying via a message."""
         await restart_kernel(self, chat_id, message_id)
+
+    @property
+    def inline_manager(self):
+        """Alias for the InlineManager instance."""
+        return getattr(self, "_inline", None)
 
     @property
     def db_conn(self):

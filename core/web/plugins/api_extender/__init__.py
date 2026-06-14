@@ -5,10 +5,14 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from core.lib.types import Kernel
 
 from aiohttp import web
 
+from core.web import app_keys
 from core.web.auth import require_auth
 
 logger = logging.getLogger(__name__)
@@ -68,7 +72,7 @@ def _json_error(
 
 
 def _kernel_ready(app: web.Application) -> tuple[Any, web.Response | None]:
-    kernel = app.get("kernel")
+    kernel = app.get(app_keys.KERNEL)
     if kernel is None:
         return None, _json_error(
             "Kernel is not available",
@@ -78,7 +82,7 @@ def _kernel_ready(app: web.Application) -> tuple[Any, web.Response | None]:
     return kernel, None
 
 
-def _save_kernel_config(kernel: Any) -> None:
+def _save_kernel_config(kernel: Kernel) -> None:
     if hasattr(kernel, "save_config") and callable(kernel.save_config):
         try:
             kernel.save_config()
@@ -126,7 +130,7 @@ async def api_health(request: web.Request) -> web.Response:
             "service": "mcub-web-api-extender",
             "time": int(time.time()),
             "prefix": getattr(kernel, "custom_prefix", "."),
-            "api_prefix": request.app.get("api_extender_prefix"),
+            "api_prefix": request.app.get(app_keys.API_EXTENDER_PREFIX),
         }
     )
 
@@ -422,7 +426,7 @@ def _register_routes(app: web.Application, prefix: str) -> None:
     app.router.add_post(f"{prefix}/config", api_config_set)
 
 
-def setup(app: web.Application, kernel: Any) -> None:
+def setup(app: web.Application, kernel: Kernel) -> None:
     config_prefix = None
     if kernel is not None and hasattr(kernel, "config"):
         ext_cfg = kernel.config.get("web_api_extender")
@@ -432,7 +436,7 @@ def setup(app: web.Application, kernel: Any) -> None:
     env_prefix = os.environ.get("MCUB_WEB_API_PREFIX")
     prefix = _normalize_prefix(env_prefix or config_prefix or "/api/ext")
 
-    app["api_extender_prefix"] = prefix
+    app[app_keys.API_EXTENDER_PREFIX] = prefix
 
     _register_routes(app, prefix)
 

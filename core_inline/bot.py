@@ -885,6 +885,11 @@ class InlineBot:
                 self.logger.warning(
                     "[InlineBot] aiogram runtime unavailable, using Telethon-only mode"
                 )
+            if not self.kernel.premium_user:
+                self.bot_client.convert_emoji = True
+                self.kernel.logger.debug(
+                    "convert emoji on: %s", self.bot_client.convert_emoji
+                )
         except Exception:
             self.logger.error("[InlineBot] runtime start failed", exc_info=True)
 

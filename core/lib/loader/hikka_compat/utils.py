@@ -54,6 +54,15 @@ class _Utils:
     async def answer(message, text: str = "", **kwargs):
         if "response" in kwargs and not text:
             text = kwargs.pop("response")
+
+        # Resolve {placeholders} via the native system.
+        try:
+            from utils.custom_placeholders import resolve_placeholders as _res
+
+            text = await _res("any", text)
+        except ImportError:
+            pass
+
         reply_markup = kwargs.pop("reply_markup", None)
         parse_mode = kwargs.pop("parse_mode", "html")
         file = kwargs.pop("file", None)
@@ -379,14 +388,30 @@ class _Utils:
         callback,
         description: str | None = None,
     ):
-        module_name = getattr(
+        cls_name = getattr(
             getattr(callback, "__self__", None), "__class__", type("X", (), {})
         ).__name__
         _PLACEHOLDERS[placeholder] = {
-            "module_name": module_name,
+            "module_name": cls_name,
             "callback": callback,
             "description": description,
         }
+        # Determine the correct native scope.  If the callback is bound
+        # to a module instance that has _module_name (set by _mcub_bind),
+        # use that — it matches the kernel key that .man looks up.
+        module_instance = getattr(callback, "__self__", None)
+        native_scope = getattr(module_instance, "_module_name", None) or cls_name
+        try:
+            from utils.custom_placeholders import register_placeholder as _nreg
+
+            _nreg(
+                scope=native_scope,
+                key=placeholder,
+                callback=callback,
+                description=description,
+            )
+        except ImportError:
+            pass
         return True
 
     @staticmethod
@@ -413,6 +438,13 @@ class _Utils:
         ]
         for name in to_remove:
             _PLACEHOLDERS.pop(name, None)
+        # Also clean up in the native system.
+        try:
+            from utils.custom_placeholders import unregister_scope
+
+            unregister_scope(module_name)
+        except ImportError:
+            pass
         return len(to_remove)
 
     @staticmethod

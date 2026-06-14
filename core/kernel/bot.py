@@ -11,11 +11,13 @@ from __future__ import annotations
 # 🌐 github MCUB-fork: https://github.com/hairpin01/MCUB-fork
 import asyncio
 import hashlib
-import html
 import os
 import time
 import traceback
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from core.lib.types import Event
 
 from utils.restart import read_restart_context
 
@@ -255,7 +257,7 @@ class Kernel(_StandardKernel):
             self.logger.error(f"[BotKernel] init_client error: {e}")
             return False
 
-    def should_process_command_event(self, event: Any) -> bool:
+    def should_process_command_event(self, event: Event) -> bool:
         """Process only messages sent BY the bot itself (out=True).
 
         Nobody else's messages trigger commands - only the bot's own outgoing
@@ -271,68 +273,18 @@ class Kernel(_StandardKernel):
         return False
 
     def _register_core_handlers(self) -> None:
-        """Register outgoing message handlers the same way standard does."""
-        from telethon import events
-
-        async def message_handler(event):
-            _tele = '<tg-emoji emoji-id="5429283852684124412">🔭</tg-emoji>'
-            _note = '<tg-emoji emoji-id="5334882760735598374">📝</tg-emoji>'
-
-            if not self.should_process_command_event(event):
-                return
-            if self._is_command_event_processed(event):
-                return
-
-            self._mark_command_event_processed(event)
-            try:
-                await self.process_command(event)
-            except Exception as e:
-                await self.handle_error(
-                    e, message="Bot message handler error", event=event
-                )
-
-                from telethon.errors import RPCError
-
-                lang = self.config.get("language", "ru")
-                from core.langpacks import get_kernel_strings
-
-                s = get_kernel_strings(lang)
-
-                if isinstance(e, RPCError):
-                    try:
-                        await event.edit(
-                            f"{_tele} {s.get('rpc_error', '').format(error=html.escape(str(e)))}",
-                            parse_mode="html",
-                        )
-                    except Exception:
-                        pass
-                    return
-
-                tb_str = traceback.format_exc()
-                if len(tb_str) > 1000:
-                    tb_str = tb_str[-1000:] + "\n...(truncated)"
-                try:
-                    await event.edit(
-                        f"{_tele} {s.get('call_failed_traceback', '').format(cmd=html.escape(event.text or ''), traceback=tb_str)}",
-                        parse_mode="html",
-                    )
-                except Exception:
-                    pass
-
-        async def fallback_handler(event):
-            if not self.should_process_command_event(event):
-                return
-            if self._is_command_event_processed(event):
-                return
-            self._mark_command_event_processed(event)
-            await self.process_command(event)
-
-        self._core_message_handler = message_handler
-        self._core_fallback_message_handler = fallback_handler
-        self.client.add_event_handler(message_handler, events.NewMessage())
-        self.client.add_event_handler(message_handler, events.MessageEdited())
-        self.client.add_event_handler(fallback_handler, events.NewMessage())
-        self.logger.debug("[BotKernel] core handlers registered")
+        """Register outgoing message handlers via the central dispatcher."""
+        if self.dispatcher is not None:
+            self._core_message_handler = self.dispatcher.watcher_message_handler
+            self._core_fallback_message_handler = (
+                self.dispatcher.watcher_message_handler
+            )
+            self.dispatcher.register()
+            self.logger.debug("[BotKernel] dispatcher registered")
+        else:
+            self.logger.error(
+                "[BotKernel] dispatcher unavailable — no core handlers registered"
+            )
 
     async def _send_early_restart_notification(self) -> None:
         """Edit the restart message right after connect (modules not loaded yet)."""

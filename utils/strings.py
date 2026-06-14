@@ -7,9 +7,10 @@
 
 from __future__ import annotations
 
+import weakref
 from typing import Any
 
-__all__ = ["Strings", "get_available_locales"]
+__all__ = ["Strings", "get_available_locales", "reload_packs"]
 
 _FALLBACK = "en"
 _GROUP_VALUE = "__value__"
@@ -51,6 +52,31 @@ def _load_langpacks() -> dict[str, dict[str, Any]]:
     except ImportError:
         _LANGPACKS_CACHE = {}
         return _LANGPACKS_CACHE
+
+
+def reload_packs() -> None:
+    global _LANGPACKS_CACHE
+    _LANGPACKS_CACHE = None
+    try:
+        from core.langpacks import clear_langpacks_cache
+
+        clear_langpacks_cache()
+    except ImportError:
+        pass
+    current = {}
+    for inst in list(Strings._instances):
+        old_locale = inst._locale
+        module_name = getattr(inst, "_module_name", None)
+        if module_name is not None:
+            current[module_name] = inst
+    for module_name, inst in current.items():
+        data = {"name": module_name}
+        try:
+            new_data = inst._load_from_langpacks(module_name, data)
+            inst._data = new_data
+            inst.set_locale(old_locale)
+        except Exception:
+            pass
 
 
 class _MissingKey(str):
@@ -145,6 +171,8 @@ def _wrap_group_value(name: str, value: dict[str, Any], *, strict: bool) -> Any:
 
 
 class Strings:
+    _instances: weakref.WeakSet[Strings] = weakref.WeakSet()
+
     def __init__(
         self,
         kernel_or_lang,
@@ -158,6 +186,7 @@ class Strings:
 
         self._fallback = fallback
         self._strict = strict
+        Strings._instances.add(self)
 
         # Resolve language
         if isinstance(kernel_or_lang, str):
@@ -316,6 +345,19 @@ class Strings:
                 )
 
         return problems
+
+    def set_locale(self, locale: str) -> None:
+        """Switch this Strings instance to a different locale at runtime."""
+        self._locale = locale
+        new_active = self._data.get(locale) or self._data.get(self._fallback)
+        if new_active:
+            self._active = new_active
+
+    @classmethod
+    def refresh_all(cls, locale: str) -> None:
+        """Switch all registered Strings instances to a new locale."""
+        for inst in list(cls._instances):
+            inst.set_locale(locale)
 
     def __repr__(self) -> str:
         return (

@@ -246,6 +246,11 @@ class LogBot(ModuleBase):
                         "notify_new_commits: message was deleted before button could be clicked"
                     )
                 except Exception as e:
+                    if e.__class__.__name__ == "MessageIdInvalidError":
+                        self.kernel.logger.warning(
+                            "notify_new_commits: callback target is no longer valid"
+                        )
+                        return
                     await self.kernel.handle_error(
                         e, message='Failed call "click"', event=_message_edit
                     )
@@ -277,11 +282,14 @@ class LogBot(ModuleBase):
                 return
 
             newest_sha = commits[0][0]
-            last_sha = self.kernel.cache.get("log_bot:last_notified_sha")
-            if newest_sha == last_sha:
+            stored = await self.kernel.db_get(
+                "log_bot", "last_notified_sha"
+            ) or self.kernel.cache.get("log_bot:last_notified_sha")
+            if newest_sha == stored:
                 return
 
             await self.notify_new_commits(commits, branch)
+            await self.kernel.db_set("log_bot", "last_notified_sha", newest_sha)
             self.kernel.cache.set("log_bot:last_notified_sha", newest_sha)
 
         except Exception as e:

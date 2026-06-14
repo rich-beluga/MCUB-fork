@@ -416,12 +416,20 @@ class Kernel:
         """
         result = await self._cfg.save_module_config(module_name, config_data)
 
-        # Update live config schema
         live_cfg = self._live_module_configs.get(module_name)
-        if live_cfg and hasattr(live_cfg, "_values"):
-            for key, value in config_data.items():
-                if key != "__mcub_config__":
-                    live_cfg[key] = value
+        if live_cfg is not None:
+            if hasattr(live_cfg, "_values"):
+                for key, value in config_data.items():
+                    if key != "__mcub_config__":
+                        live_cfg[key] = value
+        else:
+            live_mod = self.loaded_modules.get(module_name) or self.system_modules.get(
+                module_name
+            )
+            if live_mod is not None:
+                module_config = getattr(live_mod, "config", None)
+                if module_config is not None:
+                    self._live_module_configs[module_name] = module_config
 
         return result
 
@@ -435,6 +443,7 @@ class Kernel:
         Args:
             module_name: Name of the module.
         """
+        self._live_module_configs.pop(module_name, None)
         return await self._cfg.delete_module_config(module_name)
 
     async def get_module_config_key(self, module_name: str, key: str, default=None):
@@ -580,9 +589,21 @@ class Kernel:
         removed = []
         dedupe_types = {"NewMessage", "MessageEdited"}
 
+        _core = getattr(self, "_core_message_handler", None)
+        _fallback = getattr(self, "_core_fallback_message_handler", None)
+
         for event_obj, callback in reversed(builders):
             event_type = type(event_obj).__name__
             if event_type not in dedupe_types:
+                continue
+            # Never dedupe core command handlers.
+            # Use == not is because bound-method objects produce a new
+            # object on each access while sharing the same func+instance.
+            if _core is not None and callback == _core:
+                seen.add(self._event_builder_signature(event_obj, callback))
+                continue
+            if _fallback is not None and callback == _fallback:
+                seen.add(self._event_builder_signature(event_obj, callback))
                 continue
             signature = self._event_builder_signature(event_obj, callback)
             if signature in seen:
@@ -624,22 +645,31 @@ class Kernel:
             )
             return
 
+        _handler = self._core_message_handler
+        _fallback = getattr(self, "_core_fallback_message_handler", None)
+
         builders = getattr(self.client, "_event_builders", []) or []
         has_new = any(
-            cb == self._core_message_handler and type(ev).__name__ == "NewMessage"
-            for ev, cb in builders
+            cb == _handler and type(ev).__name__ == "NewMessage" for ev, cb in builders
         )
         has_fallback = any(
-            cb == getattr(self, "_core_fallback_message_handler", None)
+            _fallback is not None
+            and cb == _fallback
             and type(ev).__name__ == "NewMessage"
+            for ev, cb in builders
+        )
+        has_edit = any(
+            cb == _handler and type(ev).__name__ == "MessageEdited"
             for ev, cb in builders
         )
 
         self.logger.debug(
-            "[core_handlers] ensure reason=%r has_new=%s has_fallback=%s builders=%r",
+            "[core_handlers] ensure reason=%r has_new=%s has_fallback=%s "
+            "has_edit=%s builders=%r",
             reason,
             has_new,
             has_fallback,
+            has_edit,
             self._debug_event_builders_snapshot(),
         )
 
@@ -647,28 +677,40 @@ class Kernel:
         if force_rebind:
             before_rebind = self._debug_event_builders_snapshot()
             self.logger.debug(
-                "[core_handlers] force-rebind-start reason=%r has_new=%s has_fallback=%s builders=%r",
+                "[core_handlers] force-rebind-start reason=%r "
+                "has_new=%s has_fallback=%s has_edit=%s builders=%r",
                 reason,
                 has_new,
                 has_fallback,
+                has_edit,
                 before_rebind,
             )
-            self.client.remove_event_handler(
-                self._core_message_handler, events.NewMessage()
-            )
-            if hasattr(self, "_core_fallback_message_handler"):
-                self.client.remove_event_handler(
-                    self._core_fallback_message_handler, events.NewMessage()
-                )
-            self.client.add_event_handler(
-                self._core_message_handler, events.NewMessage()
-            )
-            if hasattr(self, "_core_fallback_message_handler"):
-                self.client.add_event_handler(
-                    self._core_fallback_message_handler, events.NewMessage()
-                )
+
+            # Purge ALL existing core handler bindings from builders directly
+            # to avoid bound-method identity issues with remove_event_handler.
+            _handler = self._core_message_handler
+            _fallback = getattr(self, "_core_fallback_message_handler", None)
+            _handlers_to_purge = {_handler}
+            if _fallback is not None:
+                _handlers_to_purge.add(_fallback)
+            if hasattr(self.client, "_event_builders"):
+                self.client._event_builders = [
+                    (ev, cb)
+                    for ev, cb in self.client._event_builders
+                    if not any(cb == h for h in _handlers_to_purge)
+                ]
+
+            self.client.add_event_handler(_handler, events.NewMessage())
+            # _fallback is always the same bound method as _handler in all
+            # current kernels — only add it when they genuinely differ.
+            if _fallback is not None and _fallback is not _handler:
+                self.client.add_event_handler(_fallback, events.NewMessage())
+            self.client.add_event_handler(_handler, events.MessageEdited())
+            self.client.add_event_handler(_handler, events.MessageEdited())
+
             self.logger.debug(
-                "[core_handlers] force-rebind-done reason=%r builders_before=%r builders_after=%r",
+                "[core_handlers] force-rebind-done reason=%r "
+                "builders_before=%r builders_after=%r",
                 reason,
                 before_rebind,
                 self._debug_event_builders_snapshot(),
@@ -676,20 +718,23 @@ class Kernel:
             return
 
         if not has_new:
-            self.client.add_event_handler(
-                self._core_message_handler, events.NewMessage()
-            )
+            self.client.add_event_handler(_handler, events.NewMessage())
             self.logger.warning(
                 "[core_handlers] restored outgoing NewMessage handler reason=%r",
                 reason,
             )
 
-        if hasattr(self, "_core_fallback_message_handler") and not has_fallback:
-            self.client.add_event_handler(
-                self._core_fallback_message_handler, events.NewMessage()
-            )
+        if _fallback is not None and not has_fallback:
+            self.client.add_event_handler(_fallback, events.NewMessage())
             self.logger.warning(
                 "[core_handlers] restored fallback NewMessage handler reason=%r",
+                reason,
+            )
+
+        if not has_edit:
+            self.client.add_event_handler(_handler, events.MessageEdited())
+            self.logger.warning(
+                "[core_handlers] restored MessageEdited handler reason=%r",
                 reason,
             )
 
@@ -1065,89 +1110,10 @@ class Kernel:
         return await handler(event)
 
     async def process_command(self, event, depth: int = 0) -> bool:
-        """Dispatch an outgoing message to the matching command handler.
-
-        Resolves aliases recursively up to MAX_ALIAS_DEPTH.
-        """
-        if depth > MAX_ALIAS_DEPTH:
-            self.logger.error(f"alias recursion limit reached: {event.text!r}")
-            return False
-
-        text = event.text
-        active_prefix = self.get_prefix_for_sender(getattr(event, "sender_id", None))
-        self.logger.debug(
-            "[process_command] depth=%d text=%r sender=%r chat=%r handlers=%d aliases=%d",
-            depth,
-            text,
-            getattr(event, "sender_id", None),
-            getattr(event, "chat_id", None),
-            len(self.command_handlers),
-            len(self.aliases),
-        )
-        if not text or not text.startswith(active_prefix):
-            self.logger.debug(
-                "[process_command] ignored text=%r reason=no_prefix prefix=%r",
-                text,
-                active_prefix,
-            )
-            return False
-
-        cmd = (
-            text[len(active_prefix) :].split()[0]
-            if " " in text
-            else text[len(active_prefix) :]
-        )
-
-        if cmd in self.aliases:
-            alias = self.aliases[cmd]
-            # Extract just the command name (first word) from alias for the check
-            alias_cmd = alias.split()[0] if " " in alias else alias
-            args = text[len(active_prefix) + len(cmd) :]
-            # Use full alias (with its args) plus user args
-            new_text = active_prefix + alias + args
-            self.logger.debug(
-                "[process_command] alias-hit cmd=%r target=%r text=%r",
-                cmd,
-                alias,
-                text,
-            )
-            # Extract just the command name (first word) from alias for the check
-            alias_cmd = alias.split()[0] if " " in alias else alias
-            if alias_cmd not in self.command_handlers and alias_cmd not in self.aliases:
-                self.logger.warning(
-                    f"Alias '{cmd}' points to non-existent target '{alias}', "
-                    f"executing '{cmd}' directly"
-                )
-                if cmd in self.command_handlers:
-                    await self.command_handlers[cmd](event)
-                    return True
-                return False
-            event.text = new_text
-            if hasattr(event, "message"):
-                event.message.message = new_text
-                event.message.text = new_text
-            # Always use recursive text replacement for aliases
-            return await self.process_command(event, depth + 1)
-
-        if cmd in self.command_handlers:
-            self.logger.debug(
-                "[process_command] dispatch cmd=%r owner=%r handler=%r",
-                cmd,
-                self.command_owners.get(cmd),
-                getattr(
-                    self.command_handlers[cmd],
-                    "__name__",
-                    repr(self.command_handlers[cmd]),
-                ),
-            )
-            await self.command_handlers[cmd](event)
-            return True
-
-        self.logger.debug(
-            "[process_command] miss cmd=%r known=%r",
-            cmd,
-            sorted(self.command_handlers.keys()),
-        )
+        """Proxy to ``dispatcher.process_command``."""
+        if self.dispatcher is not None:
+            return await self.dispatcher.process_command(event, depth)
+        self.logger.error("dispatcher unavailable — cannot process command")
         return False
 
     def get_prefix_for_sender(self, sender_id):
@@ -1360,67 +1326,20 @@ class Kernel:
             self.inline_bot = InlineBot(self)
             await self.inline_bot.setup()
 
-        async def _on_message(event):
-            msg = getattr(event, "message", event)
-            if not self.should_process_command_event(event):
-                self.logger.debug(
-                    "[core_handlers] skip-nonoutgoing handler=_on_message text=%r sender=%r chat=%r out=%r admin=%r",
-                    getattr(msg, "text", None),
-                    getattr(event, "sender_id", None),
-                    getattr(event, "chat_id", None),
-                    getattr(msg, "out", False),
-                    self.is_admin(getattr(event, "sender_id", None)),
-                )
-                return
-            if self._is_command_event_processed(event):
-                self.logger.debug(
-                    "[core_handlers] skip-duplicate handler=_on_message text=%r sender=%r chat=%r",
-                    getattr(msg, "text", None),
-                    getattr(event, "sender_id", None),
-                    getattr(event, "chat_id", None),
-                )
-                return
-            self._mark_command_event_processed(event)
-            try:
-                await self.process_command(event)
-            except Exception as e:
-                await self.handle_error(e, message="Message handler error", event=event)
-                tb = traceback.format_exc()
-                if len(tb) > 1000:
-                    tb = "…" + tb[-997:]
-                try:
-                    await event.edit(
-                        f"<b>Error in <code>{event.text}</code></b>\n<pre>{tb}</pre>",
-                        parse_mode="html",
-                    )
-                except Exception:
-                    pass
-
-        async def _fallback_on_message(event):
-            msg = getattr(event, "message", event)
-            if not self.should_process_command_event(event):
-                return
-            if self._is_command_event_processed(event):
-                return
-            self.logger.warning(
-                "[core_handlers] fallback-dispatch handler=_fallback_on_message text=%r sender=%r chat=%r out=%r admin=%r",
-                getattr(msg, "text", None),
-                getattr(event, "sender_id", None),
-                getattr(event, "chat_id", None),
-                getattr(msg, "out", False),
-                self.is_admin(getattr(event, "sender_id", None)),
+        if self.dispatcher is not None:
+            self._core_message_handler = self.dispatcher.watcher_message_handler
+            self._core_fallback_message_handler = (
+                self.dispatcher.watcher_message_handler
             )
-            self._mark_command_event_processed(event)
-            await self.process_command(event)
-
-        self._core_message_handler = _on_message
-        self._core_fallback_message_handler = _fallback_on_message
-        self.client.add_event_handler(_on_message, events.NewMessage())
-        self.client.add_event_handler(_fallback_on_message, events.NewMessage())
-        self.logger.debug(
-            "[core_handlers] registered outgoing handlers builders=%r",
-            self._debug_event_builders_snapshot(),
-        )
+            self.dispatcher.register()
+            self.logger.debug(
+                "[core_handlers] registered dispatcher builders=%r",
+                self._debug_event_builders_snapshot(),
+            )
+        else:
+            self.logger.error(
+                "[core_handlers] dispatcher unavailable — no core handlers registered"
+            )
 
         await self._notify_early_restart()
 

@@ -1241,6 +1241,24 @@ class InlineProxy:
                     prepared_row.append(btn)
                     continue
                 if ("switch" in btn or "input" in btn) and "callback" not in btn:
+                    # Hikka "input" buttons use the "handler" key (not "callback").
+                    # Register via inline_temp so ::inline_send_handler dispatches
+                    # the user's typed text back to handler(call, text, *args).
+                    if "input" in btn and "handler" in btn:
+                        try:
+                            from .inline_utils import _register_input_button
+
+                            _ttl = getattr(self, "_current_form_ttl", 3600)
+                            switch_query = _register_input_button(
+                                btn,
+                                inline_proxy=self,
+                                unit_id=unit_id,
+                                ttl=_ttl,
+                            )
+                            btn["_switch_query"] = switch_query
+                            btn["switch_inline_query_current_chat"] = f"{switch_query} "
+                        except Exception:
+                            pass  # fallback: button visually works, no dispatch
                     prepared_row.append(btn)
                     continue
                 if "phone" in btn and "callback" not in btn:
@@ -1368,8 +1386,21 @@ class InlineProxy:
                     btn["callback_data"] = str(btn["data"])
 
                 if "input" in btn and "switch_inline_query_current_chat" not in btn:
-                    query_id = str(btn.get("_switch_query") or _rand_token(10))
-                    btn["switch_inline_query_current_chat"] = f"{query_id} "
+                    _input_q = btn.get("_switch_query")
+                    if not _input_q and "handler" in btn:
+                        try:
+                            from .inline_utils import _register_input_button
+
+                            _input_q = _register_input_button(
+                                btn,
+                                inline_proxy=self,
+                                unit_id=unit_id,
+                                ttl=ttl,
+                            )
+                        except Exception:
+                            _input_q = None
+                    btn["_switch_query"] = _input_q or _rand_token(10)
+                    btn["switch_inline_query_current_chat"] = f"{btn['_switch_query']} "
 
                 if "copy" in btn and "copy_text" not in btn:
                     btn["copy_text"] = {"text": str(btn.get("copy", ""))}
@@ -1379,6 +1410,47 @@ class InlineProxy:
             if prepared_row:
                 prepared_rows.append(prepared_row)
         return prepared_rows
+
+    def _strip_callbacks_for_mcub(self, markup) -> list:
+        """Return a copy of prepared markup safe to pass to MCUB inline_form.
+
+        Two transforms are applied to each callback button:
+
+        1. Remove the callable ``callback`` key — MCUB's inline_form re-generates
+           its own random token for any button that carries a callable, overwriting
+           hikka_compat tokens already registered in ``inline_callback_map``.
+
+        2. Rename ``callback_data`` → ``data`` — MCUB's button-building helpers
+           (e.g. InlineManager._format_telethon_buttons) read spec.get("data"),
+           not ``callback_data``.  Without this rename the token is silently
+           dropped and Telethon-MCUB falls back to using the button text as
+           callback data.
+        """
+        if not markup:
+            return markup
+        result = []
+        for row in markup:
+            new_row = []
+            for btn in row:
+                if not isinstance(btn, dict):
+                    new_row.append(btn)
+                    continue
+                cb_data = btn.get("callback_data") or btn.get("_callback_data")
+                if cb_data:
+                    new_btn = {}
+                    for k, v in btn.items():
+                        if k == "callback" and callable(v):
+                            continue  # strip callable
+                        if k == "callback_data":
+                            new_btn["data"] = v
+                            continue
+                        if k == "_callback_data":
+                            continue
+                        new_btn[k] = v
+                    btn = new_btn
+                new_row.append(btn)
+            result.append(new_row)
+        return result
 
     def _to_telethon_buttons(self, markup):
         if not markup:
@@ -1440,6 +1512,30 @@ class InlineProxy:
                                 url=str(web_url),
                             )
                         )
+                elif "input" in button:
+                    # Hikka "input" button: register handler, build switch_inline.
+                    _switch_q = button.get("_switch_query")
+                    if not _switch_q and "handler" in button:
+                        try:
+                            from .inline_utils import _register_input_button
+
+                            _ttl = getattr(self, "_current_form_ttl", 3600)
+                            _switch_q = _register_input_button(
+                                button,
+                                inline_proxy=self,
+                                ttl=_ttl,
+                            )
+                            if _switch_q:
+                                button["_switch_query"] = _switch_q
+                        except Exception:
+                            _switch_q = None
+                    query = str(
+                        button.get(
+                            "switch_inline_query_current_chat",
+                            f"{_switch_q or ''} ",
+                        )
+                    ).strip()
+                    out_row.append(Button.switch_inline(text, query, same_peer=True))
                 elif "switch_inline_query_current_chat" in button:
                     query = str(
                         button.get("switch_inline_query_current_chat", "")
@@ -1700,7 +1796,7 @@ class InlineProxy:
                     chat_id=chat_id,
                     title=text,
                     fields=None,
-                    buttons=markup,
+                    buttons=self._strip_callbacks_for_mcub(markup),
                     auto_send=True,
                     ttl=ttl or 200,
                     media=media,
@@ -2169,10 +2265,6 @@ class InlineProxy:
                 inline_proxy=self,
             )
 
-        client = getattr(self._kernel, "client", None)
-        if client is None or not hasattr(client, "edit_message"):
-            return False
-
         edit_kwargs = {"parse_mode": "html"}
         buttons = self._to_telethon_buttons(unit.get("buttons"))
         if buttons:
@@ -2181,18 +2273,69 @@ class InlineProxy:
             edit_kwargs["file"] = media
         edit_kwargs.update(kwargs)
 
-        try:
-            result = await client.edit_message(
-                target_chat,
-                target_msg,
-                unit.get("text", ""),
-                **edit_kwargs,
-            )
-            if result:
-                self._bind_unit_message(unit_id, result)
-        except Exception as e:
-            self._kernel.logger.debug(f"[hikka_compat] _edit_unit failed: {e}")
-            return False
+        # Snapshot new callback tokens so we can roll back if edit fails.
+        # _prepare_markup already registered new tokens in inline_callback_map;
+        # if the actual Telegram edit fails the old buttons are still shown, so
+        # those new tokens would never be triggered — leaving the map poisoned.
+        cb_map = getattr(self._kernel, "inline_callback_map", None) or {}
+        if reply_markup is not None:
+            # Keys registered during this _prepare_markup call all share the
+            # current unit_id.  Snapshot them so we can remove on failure.
+            new_cb_keys = [
+                k
+                for k, v in cb_map.items()
+                if isinstance(v, dict) and v.get("unit_id") == unit_id
+            ]
+        else:
+            new_cb_keys = []
+
+        # The message was sent by the inline bot, so prefer bot_client for
+        # editing. Userbot cannot edit messages sent by another user/bot.
+        bot_client = getattr(self._kernel, "bot_client", None)
+        result = None
+        edited = False
+
+        if bot_client and hasattr(bot_client, "edit_message"):
+            try:
+                result = await bot_client.edit_message(
+                    target_chat,
+                    target_msg,
+                    unit.get("text", ""),
+                    **edit_kwargs,
+                )
+                if result:
+                    self._bind_unit_message(unit_id, result)
+                edited = True
+            except Exception as e:
+                self._kernel.logger.debug(
+                    f"[hikka_compat] _edit_unit bot_client failed, trying userbot: {e}"
+                )
+
+        if not edited:
+            client = getattr(self._kernel, "client", None)
+            if client is None or not hasattr(client, "edit_message"):
+                # Both clients unavailable — roll back new token registrations
+                # so the existing buttons still work.
+                for k in new_cb_keys:
+                    cb_map.pop(k, None)
+                return False
+            try:
+                result = await client.edit_message(
+                    target_chat,
+                    target_msg,
+                    unit.get("text", ""),
+                    **edit_kwargs,
+                )
+                if result:
+                    self._bind_unit_message(unit_id, result)
+                edited = True
+            except Exception as e:
+                self._kernel.logger.debug(f"[hikka_compat] _edit_unit failed: {e}")
+                # Roll back new token registrations — edit failed, old buttons
+                # are still shown in Telegram with the previous callback_data.
+                for k in new_cb_keys:
+                    cb_map.pop(k, None)
+                return False
 
         return _InlineMessage(
             inline_message_id=str(unit.get("inline_message_id", "") or ""),
@@ -2681,7 +2824,9 @@ class Module:
     def __init__(self):
         pass
 
-    def _mcub_bind(self, kernel, module_type: str = "native") -> None:
+    def _mcub_bind(
+        self, kernel, module_type: str = "native", *, module_name: str | None = None
+    ) -> None:
         from ..kernel_proxy import ClientProxy
 
         self._kernel = kernel
@@ -2702,6 +2847,21 @@ class Module:
             kernel.client.dispatcher = types.SimpleNamespace()
         if getattr(kernel.client.dispatcher, "security", None) is None:
             kernel.client.dispatcher.security = _CompatSecurityManager(self.client)
+
+        # Store the kernel module key so that register_placeholder can
+        # use it as the native scope — matching what .man looks up.
+        self._module_name = module_name or type(self).__name__
+
+        # Auto-register methods decorated with @loader.placeholder.
+        try:
+            from utils.custom_placeholders import (
+                register_decorated_placeholders as _rdp,
+                register_placeholder as _nreg,
+            )
+
+            _rdp(self._module_name, self)
+        except ImportError:
+            pass
         _raw_strings = type(self).__dict__.get("strings", {"name": type(self).__name__})
         self._db_owner = _raw_strings.get("name") or type(self).__name__
         self.name = _raw_strings.get("name", self._db_owner)
@@ -3023,6 +3183,12 @@ class _Utils:
     @staticmethod
     async def answer(message, text: str, **kwargs) -> None:
         parse_mode = kwargs.pop("parse_mode", "html")
+        try:
+            from utils.custom_placeholders import resolve_placeholders as _res
+
+            text = await _res("any", text)
+        except ImportError:
+            pass
         try:
             await message.edit(text, parse_mode=parse_mode, **kwargs)
         except Exception:

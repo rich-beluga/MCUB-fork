@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
+from utils.security import safe_extract_archive
+
 from ..loader.repository import validate_remote_url
 
 try:
@@ -116,8 +118,10 @@ class ModuleLoaderMixin:
         return _parse_requires(code)
 
     @staticmethod
-    def _check_forbidden_module_name(module_name: str) -> str | None:
+    def _check_forbidden_module_name(module_name: str | None) -> str | None:
         """Return a human-readable conflict reason if *module_name* is forbidden, else ``None``."""
+        if not module_name:
+            return "Module name is empty - cannot load module without a valid name."
         if module_name in FORBIDDEN_MODULE_NAMES:
             return (
                 f"Module name '{module_name}' is reserved - it shadows a Python "
@@ -132,7 +136,7 @@ class ModuleLoaderMixin:
         return None
 
     def _raise_forbidden_module_name(
-        self, module_name: str, file_path: str, *, is_system: bool = False
+        self, module_name: str | None, file_path: str, *, is_system: bool = False
     ) -> None:
         """Raise :exc:`ValueError` if *module_name* is forbidden.
 
@@ -730,7 +734,7 @@ class ModuleLoaderMixin:
     async def load_module_from_file(
         self,
         file_path: str,
-        module_name: str,
+        module_name: str | None,
         is_system: bool = False,
         is_reload: bool = False,
     ) -> tuple[bool, str]:
@@ -747,6 +751,9 @@ class ModuleLoaderMixin:
         Raises:
             CommandConflictError: When the module registers a conflicting command.
         """
+        if not module_name:
+            module_name = os.path.splitext(os.path.basename(file_path))[0]
+
         k = self.k
         try:
             self._purge_stale_loaded_module_entries()
@@ -1128,19 +1135,12 @@ class ModuleLoaderMixin:
             extract_dir = os.path.join(temp_dir, "extracted")
             os.makedirs(extract_dir, exist_ok=True)
 
-            import tarfile
-            import zipfile
-
             if archive_path.endswith((".zip", ".tar.gz", ".tgz", ".tar")):
-                if zipfile.is_zipfile(archive_path):
-                    with zipfile.ZipFile(archive_path, "r") as zf:
-                        zf.extractall(extract_dir)
-                elif tarfile.is_tarfile(archive_path):
-                    with tarfile.open(archive_path, "r:*") as tf:
-                        tf.extractall(extract_dir)
-                else:
+                try:
+                    safe_extract_archive(archive_path, extract_dir)
+                except ValueError as e:
                     shutil.rmtree(temp_dir, ignore_errors=True)
-                    return False, "Unknown archive format"
+                    return False, str(e)
             else:
                 shutil.rmtree(temp_dir, ignore_errors=True)
                 return False, "Not an archive URL"

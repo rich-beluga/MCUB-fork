@@ -1,5 +1,9 @@
 lang: en
 
+
+null:
+  null: 'null'
+
 error:
   __global__: on
   full_error: '🚫 <b>Error:</b> <code>{error}</code>
@@ -23,6 +27,11 @@ buttons:
   update: 🔄 Update
   page: 'Page: {}'
   back_menu: 🔙 Menu
+
+langbutton:
+  __global__: 1
+  btn_ru: 🇷🇺 Russian
+  btn_en: 🇬🇧 English
 
 core_inline:
   no_access: You don't have access to inline MCUB bot
@@ -160,6 +169,21 @@ eval:
   result_in_message: Result in message
   executed_in: Executed in
   ms: ms
+  usage_js: .js <code> — execute JavaScript (Node.js) code
+  usage_rb: .rb <code> — execute Ruby code
+  usage_go: .go <code> — execute Go code
+  usage_rs: .rs <code> — execute Rust code
+  lang_js: JavaScript
+  lang_rb: Ruby
+  lang_go: Go
+  lang_rs: Rust
+  not_installed: '{lang} is not installed'
+  result_header_error: 'Error:'
+  result_header_stdout: 'Print output:'
+  result_header_return: 'Returned:'
+  result_header_executed: 'Executed:'
+  result_header_output: 'Result:'
+  result_header_empty: 'Empty result'
 zen:
   success: Reboot <b>successful!</b>
   loading: but modules are still loading...
@@ -503,6 +527,15 @@ man:
   kernel_not_full_loaded: <tg-emoji emoji-id="5767151002666929821">🚫</tg-emoji> <b>The kernel has not yet fully loaded all modules</b>
     (<code>{status}</code>)
   placeholders_title: Custom placeholders
+
+translations:
+  lang_usage: '❌ Usage: {prefix}lang [ru/en]'
+  lang_available: '❌ Available languages: {langs}'
+  lang_changed: '<tg-emoji emoji-id="5902002809573740949">✅</tg-emoji> Language changed
+    to: {lang}'
+  select_language: <tg-emoji emoji-id="5472164874886846699">✨</tg-emoji> Select language
+  reloadlang_done: 'Language packs reloaded from disk'
+
 settings:
   prefix_usage: '❌ Usage: {prefix}setprefix [symbol] [id/@username/reply]'
   prefix_one_char: ❌ <b>Prefix must be exactly 1 character</b>
@@ -543,10 +576,6 @@ settings:
     • Healthcheck 3 times less frequent
 
     • Reduced load'
-  lang_usage: '❌ Usage: {prefix}lang [ru/en]'
-  lang_available: '❌ Available languages: {langs}'
-  lang_changed: '<tg-emoji emoji-id="5902002809573740949">✅</tg-emoji> Language changed
-    to: {lang}'
   inline_error: '❌ Error: {error}'
   settings_title: ⚙️ Userbot Settings
   prefix_reset: <tg-emoji emoji-id="5902002809573740949">✅</tg-emoji> Prefix reset
@@ -558,9 +587,6 @@ settings:
 
     Full Logs: <pre>{e}<pre>'
   powersave_status: 🔋 Power save mode {status}{features}
-  select_language: <tg-emoji emoji-id="5472164874886846699">✨</tg-emoji> Select language
-  btn_ru: 🇷🇺 Russian
-  btn_en: 🇬🇧 English
   settings_inline_title: ⚙️ Settings
   piped_usage: '<tg-emoji emoji-id="5767151002666929821">🚫</tg-emoji> Usage: {prefix}piped [on/off]'
   piped_on: '<tg-emoji emoji-id="5902002809573740949">✅</tg-emoji> Pipeline <b>enabled</b>
@@ -821,6 +847,7 @@ loader:
   um_system_module: '<code>{module_name}</code> - system module'
   um_success_header: '{success} <b>Remove module: {count} unloaded</b>'
   um_failed_header: '{blocked} <b>Failed: {count}</b>'
+  um_data_wiped: 'Module data has been cleaned'
   unlm_usage: '{warning} <b>Usage:</b> <code>{prefix}unlm module_name</code>'
   module_file_not_found: '{warning} <b>Module file not found</b>'
   uploading_module: '{upload} <b>Uploading module {module_name}...</b>'
@@ -1331,6 +1358,7 @@ config:
   fcfg_confirm_title: "✅ Confirm Value"
   fcfg_confirm_text: Value will be passed to config
   fcfg_confirm_success: "✅ Config key {key} updated to {value}"
+  fcfg_module_update: "✏️ Key <code>{key}</code> of module <code>{module}</code> <b>updated!</b>\n<blockquote><i>Was: {old}</i>\n<b>Now:</b> <code>{new}</code></blockquote>"
   fcfg_confirm_error: "❌ Error updating config: {error}"
   fcfg_confirm_expired: "❌ Confirmation expired or already used"
   key_deleted: "🗑️ Key deleted"

@@ -13,6 +13,7 @@ from core.langpacks import get_all_module_strings
 from core_inline.api.inline import make_cb_button
 from core_inline.lib.manager import InlineManager
 from utils.strings import Strings
+from core.lib.types import Kernel as Kernel_type
 
 ACCESS_CATEGORIES = {
     "modules": {
@@ -47,7 +48,7 @@ ACCESS_CATEGORIES = {
             "setprefix",
             "addalias",
             "delalias",
-            "lang",
+            "setlang",
             "cleardb",
             "clearmodules",
             "clearcache",
@@ -63,7 +64,7 @@ ACCESS_CATEGORIES = {
     "backup": {
         "en": {"label": "Backups", "desc": "database and modules backup"},
         "ru": {"label": "Бэкaпы", "desc": "peзepвныe кoпии бaзы и мoдyлeй"},
-        "commands": ["backup", "restore", "restore_with", "backuptime"],
+        "commands": ["backup", "restore", "restore_with"],
     },
     "terminal": {
         "en": {"label": "Terminal", "desc": "system shell commands on server"},
@@ -73,7 +74,7 @@ ACCESS_CATEGORIES = {
     "eval": {
         "en": {"label": "Code / Eval", "desc": "eval and code execution"},
         "ru": {"label": "Кoд / Eval", "desc": "eval и выпoлнeниe кoдa"},
-        "commands": ["py"],
+        "commands": ["py", "js", "rb", "go", "rs"],
     },
     "security": {
         "en": {
@@ -202,7 +203,7 @@ def _trusted_resolve_alias(kernel, command: str) -> str:
     return current
 
 
-def register(kernel):
+def register(kernel: Kernel_type) -> None:
     client = kernel.client
     language = kernel.config.get("language", "en")
     inline_manager = InlineManager(kernel)
@@ -407,16 +408,21 @@ def register(kernel):
         return "\n".join(lines)
 
     def _build_access_buttons(
-        kernel, user_id: int, access: dict, msg_ref, group_access: dict | None = None
+        kernel,
+        user_id: int,
+        access: dict,
+        msg_ref,
+        group_access: dict | None = None,
+        input_chat=None,
     ) -> list:
         """Build inline button rows using make_cb_button for temporary callbacks."""
 
-        async def on_toggle(event, uid, cat_key):
-            sender = event.sender_id
+        async def on_toggle(cb_event, uid, cat_key):
+            sender = cb_event.sender_id
             is_admin = sender == kernel.ADMIN_ID
             is_sgroup = await is_sgroup_member(sender) if not is_admin else True
             if not is_admin and not is_sgroup:
-                await event.answer()
+                await cb_event.answer()
                 return
             cur = await get_access(uid)
             cur[cat_key] = not cur.get(cat_key, False)
@@ -434,18 +440,20 @@ def register(kernel):
                 if uid in gdata.get("users", [])
             }
             new_text = _build_access_text(name, cur, g_access)
-            new_buttons = _build_access_buttons(kernel, uid, cur, None, g_access)
+            new_buttons = _build_access_buttons(
+                kernel, uid, cur, None, g_access, input_chat=input_chat
+            )
             try:
-                await event.edit(new_text, buttons=new_buttons, parse_mode="html")
+                await cb_event.edit(new_text, buttons=new_buttons, parse_mode="html")
             except Exception:
                 pass
 
-        async def on_preset(event, uid, preset_key):
-            sender = event.sender_id
+        async def on_preset(cb_event, uid, preset_key):
+            sender = cb_event.sender_id
             is_admin = sender == kernel.ADMIN_ID
             is_sgroup = await is_sgroup_member(sender) if not is_admin else True
             if not is_admin and not is_sgroup:
-                await event.answer()
+                await cb_event.answer()
                 return
             preset = PRESETS[preset_key]
             await save_access(uid, dict(preset["access"]))
@@ -468,12 +476,12 @@ def register(kernel):
             except Exception:
                 pass
 
-        async def on_allow_all(event, uid):
-            sender = event.sender_id
+        async def on_allow_all(cb_event, uid):
+            sender = cb_event.sender_id
             is_admin = sender == kernel.ADMIN_ID
             is_sgroup = await is_sgroup_member(sender) if not is_admin else True
             if not is_admin and not is_sgroup:
-                await event.answer()
+                await cb_event.answer()
                 return
             full = dict.fromkeys(ACCESS_CATEGORIES, True)
             await save_access(uid, full)
@@ -489,18 +497,20 @@ def register(kernel):
                 if uid in gdata.get("users", [])
             }
             new_text = _build_access_text(name, full, g_access)
-            new_buttons = _build_access_buttons(kernel, uid, full, None, g_access)
+            new_buttons = _build_access_buttons(
+                kernel, uid, full, None, g_access, input_chat=input_chat
+            )
             try:
-                await event.edit(new_text, buttons=new_buttons, parse_mode="html")
+                await cb_event.edit(new_text, buttons=new_buttons, parse_mode="html")
             except Exception:
                 pass
 
-        async def on_deny_all(event, uid):
-            sender = event.sender_id
+        async def on_deny_all(cb_event, uid):
+            sender = cb_event.sender_id
             is_admin = sender == kernel.ADMIN_ID
             is_sgroup = await is_sgroup_member(sender) if not is_admin else True
             if not is_admin and not is_sgroup:
-                await event.answer()
+                await cb_event.answer()
                 return
             none_ = dict.fromkeys(ACCESS_CATEGORIES, False)
             await save_access(uid, none_)
@@ -513,23 +523,35 @@ def register(kernel):
                 if uid in gdata.get("users", [])
             }
             new_text = _build_access_text(name, none_, g_access)
-            new_buttons = _build_access_buttons(kernel, uid, none_, None, g_access)
+            new_buttons = _build_access_buttons(
+                kernel, uid, none_, None, g_access, input_chat=input_chat
+            )
             try:
-                await event.edit(new_text, buttons=new_buttons, parse_mode="html")
+                await cb_event.edit(new_text, buttons=new_buttons, parse_mode="html")
             except Exception:
                 pass
 
-        async def on_close(event, uid):
-            sender = event.sender_id
+        async def on_close(cb_event, uid):
+            sender = cb_event.sender_id
             is_admin = sender == kernel.ADMIN_ID
             is_sgroup = await is_sgroup_member(sender) if not is_admin else True
             if not is_admin and not is_sgroup:
-                await event.answer()
+                await cb_event.answer()
                 return
             try:
-                await kernel.client.delete_messages(event.chat_id, [event.message.id])
-            except Exception:
-                pass
+                peer = input_chat
+                result = await kernel.client.delete_messages(peer, cb_event.message_id)
+                affected = sum(r.pts_count for r in result)
+                if affected == 0:
+                    kernel.logger.error(
+                        'delete trust message "%s", "%s" failed!',
+                        cb_event.chat_id,
+                        cb_event.message_id,
+                    )
+                kernel.logger.debug("Delete (pts_count=%s)", affected)
+            except Exception as e:
+                kernel.logger.error("Error in on_close:\n%s", traceback.format_exc())
+                kernel.handle_error(e, message="Failed delete message!", event=cb_event)
 
         TTL = 600
         rows = []
@@ -579,18 +601,20 @@ def register(kernel):
             )
         rows.append(preset_row)
 
-        async def on_cmds(event, uid):
-            sender = event.sender_id
+        async def on_cmds(cb_event, uid):
+            sender = cb_event.sender_id
             is_admin = sender == kernel.ADMIN_ID
             is_sgroup = await is_sgroup_member(sender) if not is_admin else True
             if not is_admin and not is_sgroup:
-                await event.answer()
+                await cb_event.answer()
                 return
             access = await get_access(uid)
             cmd_access = await get_cmd_access(uid)
             name = await get_user_display(uid)
-            text, rows = _build_percmd_menu(uid, access, cmd_access, name)
-            await event.edit(text, buttons=rows, parse_mode="html")
+            text, rows = _build_percmd_menu(
+                uid, access, cmd_access, name, input_chat=input_chat
+            )
+            await cb_event.edit(text, buttons=rows, parse_mode="html")
 
         rows.append(
             [
@@ -649,32 +673,39 @@ def register(kernel):
         return access.get(category, False)
 
     def _build_percmd_menu(
-        user_id: int, access: dict, cmd_access: dict, name: str, page: int = 0
+        user_id: int,
+        access: dict,
+        cmd_access: dict,
+        name: str,
+        page: int = 0,
+        input_chat=None,
     ) -> tuple:
         """Build per-command menu with pagination."""
         ITEMS_PER_PAGE = 10
 
-        async def on_toggle_cmd(event, uid, cmd, current_allowed, current_page):
-            sender = event.sender_id
+        async def on_toggle_cmd(cb_event, uid, cmd, current_allowed, current_page):
+            sender = cb_event.sender_id
             is_admin = sender == kernel.ADMIN_ID
             is_sgroup = await is_sgroup_member(sender) if not is_admin else True
             if not is_admin and not is_sgroup:
-                await event.answer()
+                await cb_event.answer()
                 return
             cmd_access = await get_cmd_access(uid)
             cmd_access[cmd] = not current_allowed
             await save_cmd_access(uid, cmd_access)
             access = await get_access(uid)
             name = await get_user_display(uid)
-            text, rows = _build_percmd_menu(uid, access, cmd_access, name, current_page)
-            await event.edit(text, buttons=rows, parse_mode="html")
+            text, rows = _build_percmd_menu(
+                uid, access, cmd_access, name, current_page, input_chat=input_chat
+            )
+            await cb_event.edit(text, buttons=rows, parse_mode="html")
 
-        async def on_back(event, uid):
-            sender = event.sender_id
+        async def on_back(cb_event, uid):
+            sender = cb_event.sender_id
             is_admin = sender == kernel.ADMIN_ID
             is_sgroup = await is_sgroup_member(sender) if not is_admin else True
             if not is_admin and not is_sgroup:
-                await event.answer()
+                await cb_event.answer()
                 return
             access = await get_access(uid)
             name = await get_user_display(uid)
@@ -685,31 +716,38 @@ def register(kernel):
                 if uid in gdata.get("users", [])
             }
             text = _build_access_text(name, access, g_access)
-            buttons = _build_access_buttons(kernel, uid, access, None, g_access)
-            await event.edit(text, buttons=buttons, parse_mode="html")
+            buttons = _build_access_buttons(
+                kernel, uid, access, None, g_access, input_chat=input_chat
+            )
+            await cb_event.edit(text, buttons=buttons, parse_mode="html")
 
-        async def on_prev(event, uid, current_page):
-            sender = event.sender_id
+        async def on_prev(cb_event, uid, current_page):
+            sender = cb_event.sender_id
             is_admin = sender == kernel.ADMIN_ID
             is_sgroup = await is_sgroup_member(sender) if not is_admin else True
             if not is_admin and not is_sgroup:
-                await event.answer()
+                await cb_event.answer()
                 return
             if current_page > 0:
                 access = await get_access(uid)
                 cmd_access = await get_cmd_access(uid)
                 name = await get_user_display(uid)
                 text, rows = _build_percmd_menu(
-                    uid, access, cmd_access, name, current_page - 1
+                    uid,
+                    access,
+                    cmd_access,
+                    name,
+                    current_page - 1,
+                    input_chat=input_chat,
                 )
-                await event.edit(text, buttons=rows, parse_mode="html")
+                await cb_event.edit(text, buttons=rows, parse_mode="html")
 
-        async def on_next(event, uid, current_page):
-            sender = event.sender_id
+        async def on_next(cb_event, uid, current_page):
+            sender = cb_event.sender_id
             is_admin = sender == kernel.ADMIN_ID
             is_sgroup = await is_sgroup_member(sender) if not is_admin else True
             if not is_admin and not is_sgroup:
-                await event.answer()
+                await cb_event.answer()
                 return
             all_cmds = get_all_commands()
             total_pages = (len(all_cmds) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
@@ -718,9 +756,14 @@ def register(kernel):
                 cmd_access = await get_cmd_access(uid)
                 name = await get_user_display(uid)
                 text, rows = _build_percmd_menu(
-                    uid, access, cmd_access, name, current_page + 1
+                    uid,
+                    access,
+                    cmd_access,
+                    name,
+                    current_page + 1,
+                    input_chat=input_chat,
                 )
-                await event.edit(text, buttons=rows, parse_mode="html")
+                await cb_event.edit(text, buttons=rows, parse_mode="html")
 
         TTL = 600
         all_cmds = get_all_commands()
@@ -834,7 +877,9 @@ def register(kernel):
         }
 
         text = _build_access_text(name, access, group_access)
-        buttons = _build_access_buttons(kernel, user_id, access, None, group_access)
+        buttons = _build_access_buttons(
+            kernel, user_id, access, None, group_access, input_chat=event.input_chat
+        )
 
         await kernel.inline_form(
             event.chat_id,
@@ -848,11 +893,18 @@ def register(kernel):
     @kernel.register.command(
         "trust",
         alias=["addowner"],
-        doc_en="add user to trusted list",
-        doc_ru="дoбaвить пoльзoвaтeля в дoвepeнныe",
+        doc_en="add user to trusted list, -f/--force skip confirm, -n/--nonick also add to nonick",
+        doc_ru="дoбaвить пoльзoвaтeля в дoвepeнныe, -f/--force бeз пoдтвepждeния, -n/--nonick тaкжe в nonick",
     )
     async def trust_handler(event):
         """Add a user to the trusted list with confirmation and time options"""
+
+        from utils.arg_parser import parse_arguments
+
+        full_text = getattr(event, "text", getattr(event, "raw_text", "")) or ""
+        parsed = parse_arguments(full_text, prefix=kernel.custom_prefix)
+        force_flg = parsed.get_flag("f") or parsed.get_flag("force")
+        nonick_flg = parsed.get_flag("n") or parsed.get_flag("nonick")
 
         user_id = await get_user_id(event)
         if not user_id:
@@ -866,12 +918,61 @@ def register(kernel):
 
         await get_user_display(user_id)
 
-        async def on_time_select(event, uid, seconds):
-            if event.sender_id != kernel.ADMIN_ID:
-                await event.answer()
+        async def _finish_add(uid, add_nonick, timed=False, seconds=0):
+            trusted = await get_trusted_list()
+            if uid not in trusted:
+                trusted.append(uid)
+                await save_trusted_list(trusted)
+                default_access = {
+                    cat: (cat in ("modules", "inline", "callback"))
+                    for cat in ACCESS_CATEGORIES
+                }
+                await save_access(uid, default_access)
+                if default_access.get("inline", False):
+                    await inline_manager.allow_user(uid)
+
+            nonick_list = await get_nonick_list()
+            if add_nonick and uid not in nonick_list:
+                nonick_list.append(uid)
+                await save_nonick_list(nonick_list)
+            elif not add_nonick and uid in nonick_list:
+                nonick_list.remove(uid)
+                await save_nonick_list(nonick_list)
+
+            await get_user_display(uid)
+            if timed:
+                time_str = _format_duration(seconds)
+                await event.edit(
+                    s["trust_added_timed"].format(time=time_str),
+                    parse_mode="html",
+                )
+            else:
+                await event.edit(
+                    s["trust_added"],
+                    parse_mode="html",
+                )
+
+        if force_flg and nonick_flg:
+            await _finish_add(user_id, True)
+            return
+
+        async def on_time_select(cb_event, uid, seconds, auto_nonick=False):
+            if cb_event.sender_id != kernel.ADMIN_ID:
+                await cb_event.answer()
                 return
-            if seconds == 0:
-                await _show_nonick_step(event, uid)
+            if auto_nonick:
+                if seconds == 0:
+                    await _finish_add(uid, True)
+                else:
+                    import time
+
+                    expiry = int(time.time()) + seconds
+                    expired = await get_expired_trusted()
+                    expired[str(uid)] = expiry
+                    await save_expired_trusted(expired)
+                    await _finish_add(uid, True, timed=True, seconds=seconds)
+            elif seconds == 0:
+                await _show_nonick_step(cb_event, uid)
             else:
                 import time
 
@@ -879,11 +980,11 @@ def register(kernel):
                 expired = await get_expired_trusted()
                 expired[str(uid)] = expiry
                 await save_expired_trusted(expired)
-                await _show_nonick_step(event, uid, timed=True, seconds=seconds)
+                await _show_nonick_step(cb_event, uid, timed=True, seconds=seconds)
 
-        async def _show_nonick_step(event, uid, timed=False, seconds=0):
-            if event.sender_id != kernel.ADMIN_ID:
-                await event.answer()
+        async def _show_nonick_step(cb_event, uid, timed=False, seconds=0):
+            if cb_event.sender_id != kernel.ADMIN_ID:
+                await cb_event.answer()
                 return
             name = await get_user_display(uid)
             owner_uname = await get_owner_username()
@@ -936,44 +1037,13 @@ def register(kernel):
                     ),
                 ]
             ]
-            await event.edit(text, buttons=buttons, parse_mode="html")
+            await cb_event.edit(text, buttons=buttons, parse_mode="html")
 
-        async def on_nonick(event, uid, nonick, timed=False, seconds=0):
-            if event.sender_id != kernel.ADMIN_ID:
-                await event.answer()
+        async def on_nonick(cb_event, uid, nonick, timed=False, seconds=0):
+            if cb_event.sender_id != kernel.ADMIN_ID:
+                await cb_event.answer()
                 return
-            trusted = await get_trusted_list()
-            if uid not in trusted:
-                trusted.append(uid)
-                await save_trusted_list(trusted)
-                default_access = {
-                    cat: (cat in ("modules", "inline", "callback"))
-                    for cat in ACCESS_CATEGORIES
-                }
-                await save_access(uid, default_access)
-                if default_access.get("inline", False):
-                    await inline_manager.allow_user(uid)
-
-            nonick_list = await get_nonick_list()
-            if nonick and uid not in nonick_list:
-                nonick_list.append(uid)
-                await save_nonick_list(nonick_list)
-            elif not nonick and uid in nonick_list:
-                nonick_list.remove(uid)
-                await save_nonick_list(nonick_list)
-
-            await get_user_display(uid)
-            if timed:
-                time_str = _format_duration(seconds)
-                await event.edit(
-                    s["trust_added_timed"].format(time=time_str),
-                    parse_mode="html",
-                )
-            else:
-                await event.edit(
-                    s["trust_added"],
-                    parse_mode="html",
-                )
+            await _finish_add(uid, nonick, timed=timed, seconds=seconds)
 
         def _format_duration(seconds: int) -> str:
             if seconds >= 86400:
@@ -989,13 +1059,27 @@ def register(kernel):
                 unit = "минyт" if language == "ru" else "minutes"
                 return f"{minutes} {unit}"
 
-        async def on_cancel(event):
+        async def on_cancel(cb_event):
             try:
-                await kernel.client.delete_messages(event.chat_id, [event.message.id])
-            except Exception:
-                pass
+                peer = event.input_chat
+                result = await kernel.client.delete_messages(peer, cb_event.message_id)
+                affected = sum(r.pts_count for r in result)
+                if affected == 0:
+                    kernel.logger.error(
+                        'delete trust message "%s", "%s" failed!',
+                        cb_event.chat_id,
+                        cb_event.message_id,
+                    )
+                kernel.logger.debug("Delete (pts_count=%s)", affected)
+            except Exception as e:
+                kernel.logger.error("Error in on_cancel:\n%s", traceback.format_exc())
+                kernel.handle_error(e, message="Failed delete message!", event=cb_event)
 
         TTL = 600
+
+        if force_flg:
+            await _show_nonick_step(event, user_id)
+            return
 
         text = (
             s["trust_time_title"]
@@ -1011,7 +1095,7 @@ def register(kernel):
                     kernel,
                     s["btn_1h"],
                     on_time_select,
-                    args=[user_id, 3600],
+                    args=[user_id, 3600, nonick_flg] if nonick_flg else [user_id, 3600],
                     ttl=TTL,
                     style="primary",
                 ),
@@ -1019,7 +1103,9 @@ def register(kernel):
                     kernel,
                     s["btn_24h"],
                     on_time_select,
-                    args=[user_id, 86400],
+                    args=(
+                        [user_id, 86400, nonick_flg] if nonick_flg else [user_id, 86400]
+                    ),
                     ttl=TTL,
                     style="primary",
                 ),
@@ -1027,7 +1113,11 @@ def register(kernel):
                     kernel,
                     s["btn_7d"],
                     on_time_select,
-                    args=[user_id, 604800],
+                    args=(
+                        [user_id, 604800, nonick_flg]
+                        if nonick_flg
+                        else [user_id, 604800]
+                    ),
                     ttl=TTL,
                     style="primary",
                 ),
@@ -1037,7 +1127,7 @@ def register(kernel):
                     kernel,
                     s["btn_permanent"],
                     on_time_select,
-                    args=[user_id, 0],
+                    args=[user_id, 0, nonick_flg] if nonick_flg else [user_id, 0],
                     ttl=TTL,
                     style="success",
                 ),
@@ -1795,7 +1885,7 @@ def register(kernel):
                 )
                 return
 
-            async def on_toggle_sg_cat(event, gname, cat_key, current_state):
+            async def on_toggle_sg_cat(cb_event, gname, cat_key, current_state):
                 groups = await get_sgroups()
                 if gname in groups:
                     groups[gname]["access"][cat_key] = not current_state
@@ -1803,12 +1893,12 @@ def register(kernel):
                 access = groups[gname]["access"]
                 text = _build_sgroup_access_text(gname, access)
                 buttons = _build_sgroup_access_buttons(gname, access)
-                await event.edit(text, buttons=buttons, parse_mode="html")
+                await cb_event.edit(text, buttons=buttons, parse_mode="html")
 
-            async def on_back_sg(event, gname):
-                await show_sgroup_menu(event, gname)
+            async def on_back_sg(cb_event, gname):
+                await show_sgroup_menu(cb_event, gname)
 
-            async def on_allow_all_sg(event, gname):
+            async def on_allow_all_sg(cb_event, gname):
                 groups = await get_sgroups()
                 if gname in groups:
                     groups[gname]["access"] = dict.fromkeys(ACCESS_CATEGORIES, True)
@@ -1816,9 +1906,9 @@ def register(kernel):
                 access = groups[gname]["access"]
                 text = _build_sgroup_access_text(gname, access)
                 buttons = _build_sgroup_access_buttons(gname, access)
-                await event.edit(text, buttons=buttons, parse_mode="html")
+                await cb_event.edit(text, buttons=buttons, parse_mode="html")
 
-            async def on_deny_all_sg(event, gname):
+            async def on_deny_all_sg(cb_event, gname):
                 groups = await get_sgroups()
                 if gname in groups:
                     groups[gname]["access"] = dict.fromkeys(ACCESS_CATEGORIES, False)
@@ -1826,7 +1916,7 @@ def register(kernel):
                 access = groups[gname]["access"]
                 text = _build_sgroup_access_text(gname, access)
                 buttons = _build_sgroup_access_buttons(gname, access)
-                await event.edit(text, buttons=buttons, parse_mode="html")
+                await cb_event.edit(text, buttons=buttons, parse_mode="html")
 
             TTL = 600
             access = groups[name]["access"]
@@ -1922,8 +2012,8 @@ def register(kernel):
                 )
                 return
 
-            async def on_sgroup_menu(event, gname):
-                await show_sgroup_menu(event, gname)
+            async def on_sgroup_menu(cb_event, gname):
+                await show_sgroup_menu(cb_event, gname)
 
             await show_sgroup_menu(event, name)
             return
@@ -1940,42 +2030,42 @@ def register(kernel):
         group = groups[name]
         gname = name
 
-        async def on_add_user(event, gname):
-            await event.edit(
+        async def on_add_user(cb_event, gname):
+            await cb_event.edit(
                 s["sgroup_usage"] + "\n\n" + s["sgroup_btn_add_user"], parse_mode="html"
             )
 
-        async def on_remove_user(event, gname):
-            await event.edit(
+        async def on_remove_user(cb_event, gname):
+            await cb_event.edit(
                 s["sgroup_usage"] + "\n\n" + s["sgroup_btn_remove_user"],
                 parse_mode="html",
             )
 
-        async def on_access(event, gname):
+        async def on_access(cb_event, gname):
             groups = await get_sgroups()
             if gname not in groups:
                 return
             access = groups[gname]["access"]
             text = _build_sgroup_access_text(gname, access)
             buttons = _build_sgroup_access_buttons(gname, access)
-            await event.edit(text, buttons=buttons, parse_mode="html")
+            await cb_event.edit(text, buttons=buttons, parse_mode="html")
 
-        async def on_delete_group(event, gname):
+        async def on_delete_group(cb_event, gname):
             groups = await get_sgroups()
             if gname not in groups:
                 return
 
-            async def on_confirm_delete(event, gname):
+            async def on_confirm_delete(cb_event_inner, gname):
                 groups = await get_sgroups()
                 if gname in groups:
                     del groups[gname]
                     await save_sgroups(groups)
-                await event.edit(
+                await cb_event_inner.edit(
                     s["sgroup_deleted"].format(name=gname), parse_mode="html"
                 )
 
-            async def on_cancel_delete(event, gname):
-                await show_sgroup_menu(event, gname)
+            async def on_cancel_delete(cb_event_inner, gname):
+                await show_sgroup_menu(cb_event_inner, gname)
 
             TTL = 600
             text = s["sgroup_confirm_delete"].format(name=gname)
@@ -2085,7 +2175,7 @@ def register(kernel):
         return "\n".join(lines)
 
     def _build_sgroup_access_buttons(group_name: str, access: dict) -> list:
-        async def on_toggle_sg_cat(event, gname, cat_key, current_state):
+        async def on_toggle_sg_cat(cb_event, gname, cat_key, current_state):
             groups = await get_sgroups()
             if gname in groups:
                 groups[gname]["access"][cat_key] = not current_state
@@ -2093,12 +2183,12 @@ def register(kernel):
             g_access = groups[gname]["access"]
             text = _build_sgroup_access_text(gname, g_access)
             buttons = _build_sgroup_access_buttons(gname, g_access)
-            await event.edit(text, buttons=buttons, parse_mode="html")
+            await cb_event.edit(text, buttons=buttons, parse_mode="html")
 
-        async def on_back_sg(event, gname):
-            await show_sgroup_menu(event, gname)
+        async def on_back_sg(cb_event, gname):
+            await show_sgroup_menu(cb_event, gname)
 
-        async def on_allow_all_sg(event, gname):
+        async def on_allow_all_sg(cb_event, gname):
             groups = await get_sgroups()
             if gname in groups:
                 groups[gname]["access"] = dict.fromkeys(ACCESS_CATEGORIES, True)
@@ -2106,9 +2196,9 @@ def register(kernel):
             g_access = groups[gname]["access"]
             text = _build_sgroup_access_text(gname, g_access)
             buttons = _build_sgroup_access_buttons(gname, g_access)
-            await event.edit(text, buttons=buttons, parse_mode="html")
+            await cb_event.edit(text, buttons=buttons, parse_mode="html")
 
-        async def on_deny_all_sg(event, gname):
+        async def on_deny_all_sg(cb_event, gname):
             groups = await get_sgroups()
             if gname in groups:
                 groups[gname]["access"] = dict.fromkeys(ACCESS_CATEGORIES, False)
@@ -2116,7 +2206,7 @@ def register(kernel):
             g_access = groups[gname]["access"]
             text = _build_sgroup_access_text(gname, g_access)
             buttons = _build_sgroup_access_buttons(gname, g_access)
-            await event.edit(text, buttons=buttons, parse_mode="html")
+            await cb_event.edit(text, buttons=buttons, parse_mode="html")
 
         TTL = 600
         rows = []

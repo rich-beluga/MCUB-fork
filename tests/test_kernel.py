@@ -86,6 +86,24 @@ class TestKernelCore:
         kernel = Kernel()
         assert kernel.register is not None
 
+    @patch("core.lib.kernel_core.setup_logging")
+    @patch("core.lib.kernel_core.ConfigManager")
+    @patch("core.lib.kernel_core.DatabaseManager")
+    def test_core_subsystems_import_without_degraded_fallbacks(
+        self, mock_db, mock_cfg, mock_log
+    ):
+        """Test type annotations do not break core subsystem imports."""
+        from core.kernel import Kernel
+        from core.lib import kernel_core
+
+        kernel = Kernel()
+
+        assert kernel_core.ModuleLoader is not None
+        assert kernel_core.Register is not None
+        assert kernel_core.TaskScheduler is not None
+        assert kernel._loader is not None
+        assert kernel.register is not None
+
 
 @pytest.mark.asyncio
 class TestKernelScheduler:

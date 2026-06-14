@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 import aiohttp
-from telethon.errors import ChannelsTooMuchError
+from telethon.errors import ChannelsTooMuchError, PeerIdInvalidError
 from telethon.tl.functions.channels import (
     CreateChannelRequest,
     EditPhotoRequest,
@@ -38,6 +38,7 @@ from core.lib.loader.module_config import (
     Secret,
     String,
 )
+from utils.security import safe_extract_archive, safe_extract_zip
 from utils.strings import Strings
 
 
@@ -220,135 +221,6 @@ class Backup(ModuleBase):
     )
 
     strings: dict | Strings = {"name": "userbot_backup"}
-    # OLD strings removed after migration to langpacks - kept for reference
-    """
-    _OLD_STRINGS = {
-        "ru": {
-            "creating_backup": f"{_E['hourglass']} <i>Coздaю бэкaп...</i>",
-            "backup_created": f"{_E['check']} <b>Бэкaп coздaн</b>",
-            "backup_failed": f"{_E['cross']} <i><b>Oшибкa coздaния бэкaпa</b></i>",
-            "reply_to_backup": f"{_E['cross']} <u>Oтвeтьтe нa cooбщeниe c бэкaпoм</u>",
-            "not_backup_file": f"{_E['cross']} <u>Этo нe фaйл бэкaпa</u>",
-            "restoring": f"{_E['hourglass']} <i>Вoccтaнaвливaю...</i>",
-            "restored": f"{_E['check']} <b>Вoccтaнoвлeнo:</b>",
-            "no_files": f"{_E['warning']} <u>Heт фaйлoв для вoccтaнoвлeния</u>",
-            "restore_error": f"{_E['cross']} Oшибкa:",
-            "chat_id": "Chat ID:",
-            "interval": "Интepвaл:",
-            "auto_backup": "Aвтo-бэкaп:",
-            "last_backup": "Пocлeдний бэкaп:",
-            "total_backups": "Вceгo бэкaпoв:",
-            "commands": "Кoмaнды:",
-            "set_interval": "Уcтaнoвить интepвaл бэкaпa",
-            "enable_disable": "Включить/выключить aвтo-бэкaп",
-            "set_chat": "Уcтaнoвить чaт для бэкaпa",
-            "interval_set": f"{_E['check']} Интepвaл ycтaнoвлeн нa {{hours}} чacoв",
-            "interval_invalid": f"{_E['cross']} Интepвaл дoлжeн быть oт 1 дo 168 чacoв",
-            "backup_settings": f"{_E['settings']} Hacтpoйки бэкaпa",
-            "auto_enabled": f"{_E['check']} Aвтo-бэкaп включён",
-            "auto_disabled": f"{_E['check']} Aвтo-бэкaп выключeн",
-            "chat_set": f"{_E['check']} Чaт для бэкaпa ycтaнoвлeн: {{chat_id}}",
-            "check_pm": f"{_E['check']} Пpoвepьтe ЛC c бoтoм",
-            "bot_not_available": f"{_E['warning']} Бoт нeдocтyпeн. Cнaчaлa нaпишитe бoтy в ЛC.",
-            "cant_send_pm": f"{_E['cross']} He yдaлocь oтпpaвить ЛC. Cнaчaлa нaпишитe бoтy",
-            "invalid_chat_id": f"{_E['cross']} Heвepный ID чaтa",
-            "unknown_command": f"{_E['cross']} Heизвecтнaя кoмaндa",
-            "select_interval": f"{_E['clock']} Выбepитe интepвaл бэкaпa:",
-            "processing": "🔄 Oбpaбoткa...",
-            "group_created": f"{_E['check']} Гpyппa для бэкaпoв coздaнa",
-            "tip_restore": "пoдcкaзкa: {prefix}restore для вoccтaнoвлeния бэкaпa",
-            "btn_restore": "🔄 Вoccтaнoвить",
-            "btn_1_hour": "1 чac",
-            "btn_6_hours": "6 чacoв",
-            "btn_12_hours": "12 чacoв",
-            "btn_24_hours": "24 чaca",
-            "not_set": "He ycтaнoвлeн",
-            "hours": "чacoв",
-            "enabled": "Включён",
-            "disabled": "Выключeн",
-            "invalid_interval": f"{_E['cross']} Heвepный интepвaл",
-            "error_processing": f"{_E['cross']} Oшибкa oбpaбoтки",
-            "encrypted_note": f"<blockquote>{_E['lock']} Зaшифpoвaнo</blockquote>",
-            "wrong_password": f"{_E['cross']} Heвepный пapoль или apxив пoвpeждён",
-            "hash_ok": f"{_E['check']} SHA256 coвпaдaeт - фaйл цeл",
-            "hash_mismatch": f"<blockquote>{_E['cross']} SHA256 нe coвпaдaeт - фaйл пoвpeждён!</blockquote>",
-            "hash_unknown": f"{_E['warning']} SHA256 нe нaйдeн в пoдпиcи",
-            "cloud_ok": f"{_E['cloud']} {{provider}}: зaгpyжeнo ycпeшнo",
-            "cloud_fail": f"{_E['cross']} {{provider}}: oшибкa зaгpyзки",
-            "cleanup_done": f"{_E['trash']} Удaлeнo cтapыx бэкaпoв: {{count}}",
-            "no_backups_found": f"{_E['warning']} Бэкaпы нe нaйдeны в чaтe",
-            "select_backup": f"{_E['list']} <b>Выбepитe бэкaп для вoccтaнoвлeния:</b>",
-            "delayed_scheduled": f"{_E['clock']} Бэкaп бyдeт coздaн в <b>{{time}}</b>",
-            "invalid_time": f"{_E['cross']} Heвepный фopмaт вpeмeни. Пpимep: 30m, 2h, 90s",
-            "unknown_arg": f"{_E['cross']} Heизвecтный apгyмeнт. Дocтyпнo: config, db, modules, in &lt;вpeмя&gt;, cleanup",
-            "low_disk": f"{_E['warning']} Maлo мecтa нa диcкe: нyжнo ~{{needed}}MB, cвoбoднo {{free}}MB",
-            "encrypted_restore": f"{_E['lock']} Apxив зaшифpoвaн. Укaжитe пapoль: <code>{{prefix}}restore_with &lt;пapoль&gt;</code>",
-            "restore_with_usage": f"{_E['cross']} Иcпoльзoвaниe: <code>{{prefix}}restore_with &lt;пapoль&gt;</code>",
-        },
-        "en": {
-            "creating_backup": f"{_E['hourglass']} <i>Creating backup...</i>",
-            "backup_created": f"{_E['check']} <b>Backup created</b>",
-            "backup_failed": f"{_E['cross']} <b><i>Backup failed</i></b>",
-            "reply_to_backup": f"{_E['cross']} <u>Reply to a backup message</u>",
-            "not_backup_file": f"{_E['cross']} <u>This is not a backup file</u>",
-            "restoring": f"{_E['hourglass']} <i>Restoring...</i>",
-            "restored": f"{_E['check']} Restored:",
-            "no_files": f"{_E['warning']} No files to restore",
-            "restore_error": f"{_E['cross']} Error:",
-            "backup_settings": f"{_E['settings']} Backup Settings",
-            "chat_id": "Chat ID:",
-            "interval": "Interval:",
-            "auto_backup": "Auto backup:",
-            "last_backup": "Last backup:",
-            "total_backups": "Total backups:",
-            "commands": "Commands:",
-            "set_interval": "Set backup interval",
-            "enable_disable": "Enable/disable auto backup",
-            "set_chat": "Set backup chat manually",
-            "interval_set": f"{_E['check']} Interval set to {{hours}} hours",
-            "interval_invalid": f"{_E['cross']} Interval must be between 1 and 168 hours",
-            "auto_enabled": f"{_E['check']} Auto backup enabled",
-            "auto_disabled": f"{_E['check']} Auto backup disabled",
-            "chat_set": f"{_E['check']} Backup chat set to {{chat_id}}",
-            "invalid_chat_id": f"{_E['cross']} Invalid chat ID",
-            "unknown_command": f"{_E['cross']} Unknown command",
-            "select_interval": f"{_E['clock']} Select backup interval:",
-            "check_pm": f"{_E['check']} Check your PM with the bot",
-            "bot_not_available": f"{_E['warning']} Bot not available. Please start a chat with the bot first.",
-            "cant_send_pm": f"{_E['cross']} Can't send PM. Start a chat with the bot first",
-            "processing": "🔄 Processing...",
-            "group_created": f"{_E['check']} Backup group created",
-            "tip_restore": "<blockquote>tip: {prefix}restore to restore a backup</blockquote>",
-            "btn_restore": "🔄 Restore",
-            "btn_1_hour": "1 hour",
-            "btn_6_hours": "6 hours",
-            "btn_12_hours": "12 hours",
-            "btn_24_hours": "24 hours",
-            "not_set": "Not set",
-            "hours": "hours",
-            "enabled": "Enabled",
-            "disabled": "Disabled",
-            "invalid_interval": f"{_E['cross']} Invalid interval",
-            "error_processing": f"{_E['cross']} Error processing",
-            "encrypted_note": f"<blockquote>{_E['lock']} Encrypted</blockquote>",
-            "wrong_password": f"{_E['cross']} Wrong password or corrupted archive",
-            "hash_ok": f"{_E['check']} SHA256 matches - file is intact",
-            "hash_mismatch": f"{_E['cross']} <blockquote>SHA256 mismatch - file may be corrupted!</blockquote>",
-            "hash_unknown": f"{_E['warning']} SHA256 not found in message caption",
-            "cloud_ok": f"{_E['cloud']} {{provider}}: uploaded successfully",
-            "cloud_fail": f"{_E['cross']} {{provider}}: upload failed",
-            "cleanup_done": f"{_E['trash']} Deleted {{count}} old backup(s)",
-            "no_backups_found": f"{_E['warning']} No backups found in the chat",
-            "select_backup": f"{_E['list']} <b>Select a backup to restore:</b>",
-            "delayed_scheduled": f"{_E['clock']} Backup scheduled for <b>{{time}}</b>",
-            "invalid_time": f"{_E['cross']} Invalid time format. Examples: 30m, 2h, 90s",
-            "unknown_arg": f"{_E['cross']} Unknown argument. Available: config, db, modules, in &lt;time&gt;, cleanup",
-            "low_disk": f"{_E['warning']} Low disk space: ~{{needed}}MB needed, {{free}}MB free",
-            "encrypted_restore": f"{_E['lock']} Archive is encrypted. Provide password: <code>{{prefix}}restore_with &lt;password&gt;</code>",
-            "restore_with_usage": f"{_E['cross']} Usage: <code>{{prefix}}restore_with &lt;password&gt;</code>",
-        },
-    }
-    """
 
     async def on_load(self) -> None:
         await super().on_load()
@@ -397,6 +269,17 @@ class Backup(ModuleBase):
             data = cfg.to_dict() if hasattr(cfg, "to_dict") else cfg
             await self.kernel.save_module_config(self.name, data)
 
+    async def _log_warning(self, message: str) -> None:
+        log_warning = getattr(self.kernel, "log_warning", None)
+        if callable(log_warning):
+            result = log_warning(message)
+            if hasattr(result, "__await__"):
+                await result
+            return
+
+        logger = getattr(self.kernel, "logger", None) or self.log
+        logger.warning(message)
+
     async def _schedule_backups(self) -> None:
         if self._backup_task:
             self._backup_task.cancel()
@@ -441,11 +324,14 @@ class Backup(ModuleBase):
             tmp = Path(tempfile.mkdtemp(prefix="mcub_autorestore_"))
             zip_path = tmp / "backup.zip"
             await latest.download_media(zip_path)
+            extracted_dir = tmp / "extracted"
+            safe_extract_zip(zip_path, extracted_dir)
             with zipfile.ZipFile(zip_path, "r") as zf:
                 for name in zf.namelist():
                     if name.endswith("config.json"):
-                        zf.extract(name, tmp)
-                        shutil.copy2(tmp / name, Path.cwd() / "config.json")
+                        config_path = extracted_dir / name
+                        if config_path.is_file():
+                            shutil.copy2(config_path, Path.cwd() / "config.json")
                         self.log.info("Auto-restored config.json from latest backup")
                         break
             shutil.rmtree(tmp, ignore_errors=True)
@@ -525,7 +411,7 @@ class Backup(ModuleBase):
 
         ok, estimated, free = await self.check_disk_space(all_files)
         if not ok:
-            await self.kernel.log_warning(
+            await self._log_warning(
                 f"[Backup] Low disk space: estimated {estimated // 1024}KB needed, "
                 f"{free // 1024}KB free. Backup may fail."
             )
@@ -824,6 +710,14 @@ class Backup(ModuleBase):
 
             return True
 
+        except PeerIdInvalidError as e:
+            if cfg:
+                cfg["backup_chat_id"] = None
+                await self.save_config()
+            await self._log_warning(
+                f"Backup target peer is invalid, backup_chat_id was reset: {e}"
+            )
+            return False
         except Exception as e:
             await self.kernel.handle_error(e, message="Backup send failed", event=None)
             return False
@@ -907,7 +801,7 @@ class Backup(ModuleBase):
             await self.set_group_photo(chat_id, "https://x0.at/4Bjx.jpg")
             return chat
         except ChannelsTooMuchError:
-            await self.kernel.log_warning(
+            await self._log_warning(
                 "ChannelsTooMuchError: cannot create backup group. "
                 "Leave some channels or set an existing group via config."
             )
@@ -1011,13 +905,7 @@ class Backup(ModuleBase):
                         return False
 
             extract_dir = temp_dir / "extracted"
-
-            if archive_path.name.endswith(".tar.gz"):
-                with tarfile.open(archive_path, "r:gz") as tf:
-                    tf.extractall(extract_dir)
-            else:
-                with zipfile.ZipFile(archive_path, "r") as zf:
-                    zf.extractall(extract_dir)
+            safe_extract_archive(archive_path, extract_dir)
 
             backup_dir = extract_dir / "MCUB_backup"
             if not backup_dir.exists():
@@ -1246,10 +1134,9 @@ class Backup(ModuleBase):
         reply = await event.get_reply_message()
         # Delete the command message immediately so the password is not left
         # visible in chat history (other sessions / Telegram cloud storage).
-        try:
-            await event.delete()
-        except Exception:
-            pass
+        # не удобно пиздец
+        # убрано нахуй
+
         await self._restore_from_backup_message(reply, event, password=password)
 
     @callback()

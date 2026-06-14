@@ -1,5 +1,8 @@
 lang: en
 
+null:
+  null: 'null'
+
 error:
   __global__: on
   error: "❌ [STDERR]: {error}"
@@ -157,6 +160,21 @@ eval:
   result_in_message: "stdout → msg"
   executed_in: real
   ms: ms
+  usage_js: .js <src> — run JavaScript (node)
+  usage_rb: .rb <src> — run Ruby
+  usage_go: .go <src> — run Go
+  usage_rs: .rs <src> — run Rust
+  lang_js: node
+  lang_rb: ruby
+  lang_go: golang
+  lang_rs: rustc
+  not_installed: '{lang}: not found in $PATH'
+  result_header_error: '[FAIL]'
+  result_header_stdout: '[STDOUT]'
+  result_header_return: '[EXIT]'
+  result_header_executed: '[DONE]'
+  result_header_output: '[STDOUT]'
+  result_header_empty: '[EMPTY]'
 
 zen:
   success: "[  OK  ] Reboot <b>successful</b>"
@@ -493,9 +511,6 @@ settings:
     • healthcheck: 3× less frequent
 
     • nice +10 (reduced priority)'
-  lang_usage: '❌ Usage: {prefix}lang [ru/en]'
-  lang_available: '❌ locale-gen: available locales: {langs}'
-  lang_changed: '<tg-emoji emoji-id="5902002809573740949">✅</tg-emoji> locale-gen: locale set to: {lang}'
   inline_error: '❌ [STDERR]: {error}'
   settings_title: ⚙️ "cat /etc/mcubd.conf"
   prefix_reset: <tg-emoji emoji-id="5902002809573740949">✅</tg-emoji> "unset PREFIX - reset to <code>.</code>"
@@ -506,7 +521,16 @@ settings:
 
     Full log: <pre>{e}<pre>'
   powersave_status: 🔋 "nice {status}{features}"
+
+translations:
+  lang_usage: '❌ Usage: {prefix}lang [ru/en]'
+  lang_available: '❌ locale-gen: available locales: {langs}'
+  lang_changed: '<tg-emoji emoji-id="5902002809573740949">✅</tg-emoji> locale-gen: locale set to: {lang}'
   select_language: '<tg-emoji emoji-id="5472164874886846699">✨</tg-emoji> locale-gen: select locale'
+  reloadlang_done: 'locale-gen: reloaded from disk'
+
+langbutton:
+  __global__: 1
   btn_ru: 🇷🇺 ru_RU.UTF-8
   btn_en: 🇬🇧 en_US.UTF-8
   settings_inline_title: ⚙️ /etc/mcubd.conf
@@ -744,6 +768,7 @@ loader:
   um_system_module: '<code>{module_name}</code> - EPERM: system package'
   um_success_header: '{success} <b>rmmod: {count} done</b>'
   um_failed_header: '{blocked} <b>Failed: {count}</b>'
+  um_data_wiped: 'Module data cleaned'
   unlm_usage: '{warning} <b>Usage:</b> <code>{prefix}unlm module_name</code>'
   module_file_not_found: '{warning} <b>ENOENT: Package file not found</b>'
   uploading_module: '{upload} <b>[ .... ] scp {module_name}...</b>'
@@ -1204,6 +1229,7 @@ config:
   fcfg_confirm_title: "✅ Confirm value"
   fcfg_confirm_text: "Value will be piped to /etc/mcubd.conf"
   fcfg_confirm_success: "✅ sysctl {key}={value} - done"
+  fcfg_module_update: "✏️ sysctl <code>{key}</code> for <code>{module}</code> updated!\n<blockquote><i>Was: {old}</i>\n<b>Now:</b> <code>{new}</code></blockquote>"
   fcfg_confirm_error: "❌ [STDERR]: error updating config: {error}"
   fcfg_confirm_expired: "❌ ETIMEDOUT: Confirmation expired or already used"
   key_deleted: "🗑️ unset - done"

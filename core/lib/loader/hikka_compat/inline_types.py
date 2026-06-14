@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Шмэлькa | @hairpin01
 
+from __future__ import annotations
+
 import logging
 import types
 import typing
@@ -81,20 +83,9 @@ class CompatCallbackQuery:
             kwargs["parse_mode"] = "html"
 
         _normalize_edit_reply_markup(kwargs, self._inline_proxy)
-        edit_unit = getattr(self._inline_proxy, "_edit_unit", None)
-        if callable(edit_unit) and (self.unit_id or self.inline_message_id):
-            edit_reply_markup = kwargs.pop("buttons", None)
-            result = await typing.cast(Callable[..., Awaitable[typing.Any]], edit_unit)(
-                *args,
-                unit_id=self.unit_id or None,
-                inline_message_id=self.inline_message_id,
-                chat_id=self.chat_id,
-                message_id=self.message_id,
-                reply_markup=edit_reply_markup,
-                **kwargs,
-            )
-            if result:
-                return result
+        # Use the raw Telethon event.edit() — it carries the already-resolved
+        # InputPeer from the callback update, bypassing entity-resolution
+        # failures that affect bot_client.edit_message(chat_id, msg_id).
         return await self._event.edit(*args, **kwargs)
 
 
@@ -128,6 +119,21 @@ class CompatMessage:
         )
         if self.message_id is None:
             self.message_id = getattr(message, "id", None)
+
+    @property
+    def query(self):
+        """Return command arguments (text after the first word), or full raw_text."""
+        raw = getattr(self._message, "raw_text", None)
+        if raw is None:
+            msg = getattr(self._message, "message", None)
+            if msg is not None:
+                raw = getattr(msg, "raw_text", None)
+            if raw is None:
+                raw = getattr(self._message, "text", "") or ""
+        if raw:
+            parts = raw.strip().split(maxsplit=1)
+            return parts[1] if len(parts) > 1 else ""
+        return ""
 
     def __getattr__(self, name: str):
         return getattr(self._message, name)
@@ -213,13 +219,16 @@ class InlineMessage:
         self,
         inline_message_id: str,
         unit_id: str,
-        inline_proxy: "_InlineProxy",
+        inline_proxy: _InlineProxy,
         chat_id: int | None = None,
         message_id: int | None = None,
+        *,
+        event=None,
     ):
         self.inline_message_id = inline_message_id
         self.unit_id = unit_id
         self._inline_proxy = inline_proxy
+        self._event = event
         self.chat_id = chat_id
         self.message_id = message_id
         self.inline_manager = _resolve_inline_manager(inline_proxy)
@@ -242,7 +251,7 @@ class InlineMessage:
     def default_parse_mode(self, value: str | None) -> None:
         self._default_parse_mode = value
 
-    async def edit(self, *args, **kwargs) -> "InlineMessage":
+    async def edit(self, *args, **kwargs) -> InlineMessage:
         kwargs.pop("unit_id", None)
         kwargs.pop("inline_message_id", None)
         kwargs.pop("chat_id", None)
@@ -251,9 +260,76 @@ class InlineMessage:
         if "parse_mode" not in kwargs and self._default_parse_mode is not None:
             kwargs["parse_mode"] = self._default_parse_mode
 
-        # Don't pre-convert reply_markup here - _edit_unit handles it
         reply_markup = kwargs.pop("reply_markup", None)
 
+        # Resolve {placeholders} in the message text via the native system.
+        try:
+            from utils.custom_placeholders import resolve_placeholders as _res
+
+            if args:
+                resolved = await _res("any", str(args[0]))
+                args = (resolved, *args[1:])
+            if "text" in kwargs:
+                kwargs["text"] = await _res("any", str(kwargs["text"]))
+        except ImportError:
+            pass
+
+        # If we have a stored callback event, use event.edit() directly.
+        # The event carries an already-resolved InputPeer, bypassing the
+        # entity-resolution issue that affects bot_client.edit_message().
+        if self._event is not None and hasattr(self._event, "edit"):
+            if reply_markup is not None:
+                proxy = self._inline_proxy
+                if proxy is not None and hasattr(proxy, "_prepare_markup"):
+                    try:
+                        prepared = proxy._prepare_markup(
+                            reply_markup,
+                            unit_id=self.unit_id,
+                        )
+                        converted = proxy._to_telethon_buttons(prepared)
+                        if converted is not None:
+                            kwargs["buttons"] = converted
+                    except Exception as e:
+                        logger.debug("InlineMessage markup prep failed: %s", e)
+
+            # Normalize media kwargs (photo/gif/video/file/audio) into
+            # a single ``file=`` that Telethon's edit_message accepts.
+            file_kwarg = (
+                kwargs.pop("photo", None)
+                or kwargs.pop("gif", None)
+                or kwargs.pop("video", None)
+                or kwargs.pop("file", None)
+            )
+            if not file_kwarg:
+                audio = kwargs.pop("audio", None)
+                if isinstance(audio, dict):
+                    file_kwarg = audio.get("url")
+            if file_kwarg:
+                kwargs["file"] = file_kwarg
+
+            try:
+                result = await self._event.edit(
+                    *args,
+                    **kwargs,
+                )
+                if result is not None:
+                    if self.unit_id and self._units:
+                        unit = self._units.get(self.unit_id)
+                        if unit is not None:
+                            text = None
+                            for a in args:
+                                if isinstance(a, str):
+                                    text = a
+                                    break
+                            if text is not None:
+                                unit["text"] = text
+                    return self
+            except Exception as e:
+                logger.error("InlineMessage event.edit failed: %s", e)
+                return self
+
+        # Fallback path — used when no stored event is available
+        # (e.g. InlineMessage created outside a callback handler).
         manager = self.inline_manager
         edit_unit = getattr(manager, "_edit_unit", None) if manager else None
         if callable(edit_unit):
@@ -270,7 +346,7 @@ class InlineMessage:
                 if isinstance(result, InlineMessage):
                     return result
             except Exception as e:
-                logger.debug("InlineMessage.edit fallback due to error: %s", e)
+                logger.error("InlineMessage edit_unit failed: %s", e)
 
         return self
 
@@ -313,7 +389,7 @@ class BotMessage:
         self,
         chat_id: int,
         message_id: int,
-        inline_proxy: typing.Optional["_InlineProxy"] = None,
+        inline_proxy: _InlineProxy | None = None,
         unit_id: str = "",
     ):
         self.chat_id = chat_id
@@ -340,7 +416,7 @@ class BotMessage:
     def default_parse_mode(self, value: str | None) -> None:
         self._default_parse_mode = value
 
-    async def edit(self, *args, **kwargs) -> "BotMessage":
+    async def edit(self, *args, **kwargs) -> BotMessage:
         kwargs.pop("unit_id", None)
         kwargs.pop("chat_id", None)
         kwargs.pop("message_id", None)
@@ -405,7 +481,7 @@ class InlineCall:
         self,
         call_data: str,
         unit_id: str,
-        inline_proxy: "_InlineProxy",
+        inline_proxy: _InlineProxy,
         *,
         original_call=None,
         inline_message_id: str | None = None,
@@ -449,14 +525,14 @@ class InlineCall:
         if self.original_call is not None and hasattr(self.original_call, "answer"):
             try:
                 await self.original_call.answer(
-                    text=text,
-                    show_alert=show_alert,
+                    message=text,
+                    alert=show_alert,
                     url=url,
                 )
                 self._answered = True
                 return
             except Exception as e:
-                logger.debug("InlineCall.answer fallback due to error: %s", e)
+                logger.error("InlineCall.answer failed: %s", e)
 
         self._answered = True
 
@@ -472,6 +548,7 @@ class InlineCall:
             inline_proxy=self._inline_proxy,
             chat_id=getattr(self.message, "chat_id", None),
             message_id=getattr(self.message, "message_id", None),
+            event=self.original_call,
         )
         if text is not None:
             kwargs["text"] = text
@@ -505,7 +582,7 @@ class BotInlineCall(InlineCall):
         self,
         event,
         *,
-        inline_proxy: "_InlineProxy",
+        inline_proxy: _InlineProxy,
         unit_id: str,
     ):
         self._event = event
@@ -547,7 +624,7 @@ class InlineQuery:
         query: str = "",
         offset: str = "",
         user_id: int | None = None,
-        inline_proxy: "_InlineProxy" = None,
+        inline_proxy: _InlineProxy = None,
         original_event=None,
         inline_query=None,
     ):
@@ -588,7 +665,7 @@ class InlineQuery:
         class _CompatInlineQuery:
             """Compatibility wrapper for inline_query to support answer() calls."""
 
-            def __init__(inner_self, parent: "InlineQuery"):
+            def __init__(inner_self, parent: InlineQuery):
                 inner_self._parent = parent
                 inner_self.query_id = parent.query_id
                 inner_self.query = parent.query

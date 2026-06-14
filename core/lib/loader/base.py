@@ -1,20 +1,30 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Шмэлькa | @hairpin00
 
+from __future__ import annotations
+
 import asyncio
 import copy
 import logging
+import time
 import uuid
 from abc import ABC
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from core.lib.types.event import Event
 
 try:
     from core.lib.loader.kernel_proxy import wrap_event_for_module
 except ImportError:
 
-    def wrap_event_for_module(e, *a, **kw):
+    def wrap_event_for_module(e: Any, *a: Any, **kw: Any) -> Any:
         return e
+
+
+if TYPE_CHECKING:
+    from core.lib.types import Kernel
+    from core.lib.types.client import Client
 
 
 try:
@@ -173,7 +183,7 @@ class ModuleBase(ABC):
         if user_module and not hasattr(user_module, "register"):
             user_module.register = type("RegisterObject", (), {})()
 
-        async def bound_wrapper(event: Any) -> None:
+        async def bound_wrapper(event: Event) -> None:
             if permission_tags and not self._passes_permission_tags(
                 event, permission_tags
             ):
@@ -223,7 +233,7 @@ class ModuleBase(ABC):
         if user_module and not hasattr(user_module, "register"):
             user_module.register = type("RegisterObject", (), {})()
 
-        async def bound_wrapper(event: Any, args: str, data: Any = None) -> None:
+        async def bound_wrapper(event: Event, args: str, data: Any = None) -> None:
             _pe = wrap_event_for_module(event, self.name, self.kernel)
             return await func(self, _pe, args, data)
 
@@ -272,7 +282,7 @@ class ModuleBase(ABC):
 
         return sys.modules.get(type(self).__module__)
 
-    def _passes_permission_tags(self, event: Any, tags: dict[str, Any]) -> bool:
+    def _passes_permission_tags(self, event: Event, tags: dict[str, Any]) -> bool:
         from .register import _watcher_passes_filters
 
         try:
@@ -285,7 +295,7 @@ class ModuleBase(ABC):
         self,
         func: Callable,
         instance: Any,
-        event: Any,
+        event: Event,
         handler_config: dict[str, Any],
     ) -> None:
         """Run a function with error handling based on decorator config."""
@@ -322,28 +332,28 @@ class ModuleBase(ABC):
             return getter("language", "ru") or "ru"
         return "ru"
 
-    def args(self, event: Any) -> Any:
+    def args(self, event: Event) -> Any:
         import utils
 
         text = getattr(event, "text", None) or getattr(event, "raw_text", "") or ""
         return utils.parse_arguments(text, prefix=self.get_prefix())
 
-    def args_raw(self, event: Any) -> str:
+    def args_raw(self, event: Event) -> str:
         import utils
 
         return utils.get_args_raw(event)
 
-    def args_html(self, event: Any) -> str:
+    def args_html(self, event: Event) -> str:
         import utils
 
         return utils.get_args_html(event)
 
-    async def answer(self, event: Any, text: str, **kwargs: Any) -> Any:
+    async def answer(self, event: Event, text: str, **kwargs: Any) -> Any:
         import utils
 
         return await utils.answer(event, text, **kwargs)
 
-    async def edit(self, event: Any, text: str, **kwargs: Any) -> Any:
+    async def edit(self, event: Event, text: str, **kwargs: Any) -> Any:
         reply_markup = kwargs.pop("reply_markup", None)
         as_html = kwargs.pop("as_html", False)
         if reply_markup is not None:
@@ -356,7 +366,7 @@ class ModuleBase(ABC):
             event, text, reply_markup=reply_markup, as_html=as_html, **kwargs
         )
 
-    async def reply(self, event: Any, text: str, **kwargs: Any) -> Any:
+    async def reply(self, event: Event, text: str, **kwargs: Any) -> Any:
         reply_markup = kwargs.pop("reply_markup", None)
         as_html = kwargs.pop("as_html", False)
         if reply_markup is not None:
@@ -392,7 +402,7 @@ class ModuleBase(ABC):
         ttl: int = 200,
         reply_to: int | None = None,
         **kwargs,
-    ) -> Any:
+    ) -> tuple[bool, Any]:
         """Send an inline form message.
 
         Args:
@@ -403,8 +413,12 @@ class ModuleBase(ABC):
             auto_send: If True, send immediately and return (success, message).
             ttl: Cache TTL for the form (seconds).
             reply_to: Topic/thread message ID for supergroups with topics.
+
+        Returns:
+            ``(success, InlineMessage)`` when *auto_send* is ``True``,
+            else ``(form_id,)``.
         """
-        return await self.kernel.inline_form(
+        result = await self.kernel.inline_form(
             chat_id,
             title,
             fields=fields,
@@ -414,6 +428,27 @@ class ModuleBase(ABC):
             reply_to=reply_to,
             **kwargs,
         )
+        if auto_send and result and result[0]:
+            success, raw = result
+            from core.lib.types import InlineMessage
+
+            ws_form_id = getattr(raw, "form_id", None)
+            if ws_form_id:
+                from core_inline.handlers import InlineHandlers
+
+                handlers = InlineHandlers(
+                    self.kernel, getattr(self.kernel, "bot_client", None)
+                )
+                fd = handlers.get_inline_form(ws_form_id)
+                if fd:
+                    msg = InlineMessage(
+                        raw,
+                        unit_id=ws_form_id,
+                        kernel=self.kernel,
+                    )
+                    return (True, msg)
+            return (True, InlineMessage(raw, kernel=self.kernel))
+        return result
 
     def inline_temp(
         self,
@@ -426,7 +461,7 @@ class ModuleBase(ABC):
     ) -> str:
         """Register a temporary inline command handler."""
 
-        async def bound_wrapper(event: Any, *a: Any, **kw: Any) -> None:
+        async def bound_wrapper(event: Event, *a: Any, **kw: Any) -> None:
             return await func(self, event, *a, **kw)
 
         bound_wrapper.__original__ = func
@@ -520,11 +555,14 @@ class ModuleBase(ABC):
                 cb_map.pop(tok, None)
         self._callback_tokens = []
 
-    def _register_callback(self, func: Callable, ttl: int) -> None:
-        """Register a callback handler with auto-generated uuid."""
+    def _get_callback_store(self) -> tuple[bool, Callable | None]:
         is_kernel_proxy = type(self.kernel).__name__ == "ModuleKernelProxy"
         store_callback = getattr(self.kernel, "store_inline_callback", None)
+        return is_kernel_proxy, store_callback if callable(store_callback) else None
 
+    def _ensure_inline_callback_storage(
+        self, is_kernel_proxy: bool, store_callback: Callable | None
+    ) -> None:
         if not (is_kernel_proxy and callable(store_callback)) and not hasattr(
             self.kernel, "inline_callback_map"
         ):
@@ -533,10 +571,11 @@ class ModuleBase(ABC):
             self.kernel._inline_cb_lock = threading.Lock()
             self.kernel.inline_callback_map = {}
 
+    def _make_class_callback_wrapper(self, func: Callable, ttl: int) -> Callable:
         raw_func = getattr(func, "__original__", func)
         instance = self
 
-        async def wrapper(event: Any, *args: Any, **kwargs: Any) -> None:
+        async def wrapper(event: Event, *args: Any, **kwargs: Any) -> None:
             bound_to = getattr(raw_func, "__self__", None)
             if bound_to is not None:
                 return await raw_func(event, *args, **kwargs)
@@ -547,38 +586,55 @@ class ModuleBase(ABC):
         wrapper._is_class_callback = True
         wrapper._bound_instance = self
 
-        tok = uuid.uuid4().hex
-        import time
+        return wrapper
 
+    def _store_callback_data(
+        self,
+        token: str,
+        callback_data: dict[str, Any],
+        is_kernel_proxy: bool,
+        store_callback: Callable | None,
+    ) -> None:
+        if is_kernel_proxy and callable(store_callback):
+            store_callback(token, callback_data)
+            return
+
+        lock = self.kernel._inline_cb_lock
+        cb_map = self.kernel.inline_callback_map
+
+        with lock:
+            now = time.time()
+            expired = [
+                k
+                for k, v in list(cb_map.items())
+                if v.get("expires_at") and v["expires_at"] < now
+            ]
+            for k in expired:
+                cb_map.pop(k, None)
+
+            cb_map[token] = callback_data
+
+    def _track_callback_token(self, token: str) -> None:
+        self._callback_tokens = getattr(self, "_callback_tokens", [])
+        self._callback_tokens.append(token)
+
+    def _register_callback(self, func: Callable, ttl: int) -> None:
+        """Register a callback handler with auto-generated uuid."""
+        is_kernel_proxy, store_callback = self._get_callback_store()
+        self._ensure_inline_callback_storage(is_kernel_proxy, store_callback)
+
+        tok = uuid.uuid4().hex
         callback_data = {
-            "handler": wrapper,
+            "handler": self._make_class_callback_wrapper(func, ttl),
             "args": [],
             "kwargs": {},
             "expires_at": time.time() + ttl if ttl else None,
         }
 
-        if is_kernel_proxy and callable(store_callback):
-            store_callback(tok, callback_data)
-        else:
-            lock = self.kernel._inline_cb_lock
-            cb_map = self.kernel.inline_callback_map
+        self._store_callback_data(tok, callback_data, is_kernel_proxy, store_callback)
+        self._track_callback_token(tok)
 
-            with lock:
-                now = time.time()
-                expired = [
-                    k
-                    for k, v in list(cb_map.items())
-                    if v.get("expires_at") and v["expires_at"] < now
-                ]
-                for k in expired:
-                    cb_map.pop(k, None)
-
-                cb_map[tok] = callback_data
-
-        self._callback_tokens = getattr(self, "_callback_tokens", [])
-        self._callback_tokens.append(tok)
-
-    def __init__(self, kernel: Any, client: Any, register: Any) -> None:
+    def __init__(self, kernel: Kernel, client: Client, register: Any) -> None:
         self.kernel = kernel
         self.client = client
         self._register = register
@@ -675,7 +731,7 @@ class ModuleBase(ABC):
             method_name = func.__name__
 
             async def wrapper(
-                event: Any,
+                event: Event,
                 f=func,
                 instance=self,
                 permission_tags=permission_map.get(method_name),
@@ -697,7 +753,7 @@ class ModuleBase(ABC):
                 only_admin = owner_map[method_name].get("only_admin", False)
 
                 async def owner_wrapper(
-                    event: Any, f=wrapper, only_admin=only_admin
+                    event: Event, f=wrapper, only_admin=only_admin
                 ) -> None:
                     admin_id = getattr(self.kernel, "ADMIN_ID", None)
                     sender_id = getattr(event, "sender_id", None)
@@ -724,7 +780,7 @@ class ModuleBase(ABC):
 
         for pattern, func in type(self)._inline_registry:
 
-            async def inline_wrapper(event: Any, f=func) -> None:
+            async def inline_wrapper(event: Event, f=func) -> None:
                 return await f(self, event)
 
             inline_wrapper.__original__ = func
@@ -794,7 +850,7 @@ class ModuleBase(ABC):
             kwargs_cmd = {k: v for k, v in kwargs_cmd.items() if v is not None}
 
             async def wrapper(
-                event: Any,
+                event: Event,
                 f=func,
                 permission_tags=permission_map.get(func.__name__),
             ) -> None:
@@ -825,64 +881,23 @@ class ModuleBase(ABC):
         **button_kwargs,
     ) -> Any:
         """Internal method to create callback button."""
-        import threading
-        import time
-
         from telethon import Button
 
-        is_kernel_proxy = type(self.kernel).__name__ == "ModuleKernelProxy"
-        store_callback = getattr(self.kernel, "store_inline_callback", None)
-
-        if not (is_kernel_proxy and callable(store_callback)) and not hasattr(
-            self.kernel, "inline_callback_map"
-        ):
-            self.kernel._inline_cb_lock = threading.Lock()
-            self.kernel.inline_callback_map = {}
-
-        raw_func = getattr(callback_func, "__original__", callback_func)
-        instance = self
-
-        async def wrapper(event: Any, *a: Any, **kw: Any) -> None:
-            bound_to = getattr(raw_func, "__self__", None)
-            if bound_to is not None:
-                return await raw_func(event, *a, **kw)
-            return await raw_func(instance, event, *a, **kw)
-
-        wrapper.__original__ = callback_func
-        wrapper._ttl = ttl
-        wrapper._is_class_callback = True
-        wrapper._bound_instance = self
+        is_kernel_proxy, store_callback = self._get_callback_store()
+        self._ensure_inline_callback_storage(is_kernel_proxy, store_callback)
 
         tok = uuid.uuid4().hex
 
         callback_data = {
-            "handler": wrapper,
+            "handler": self._make_class_callback_wrapper(callback_func, ttl),
             "args": args,
             "kwargs": kwargs or {},
             "data": data,
             "expires_at": time.time() + ttl if ttl else None,
         }
 
-        if is_kernel_proxy and callable(store_callback):
-            store_callback(tok, callback_data)
-        else:
-            lock = self.kernel._inline_cb_lock
-            cb_map = self.kernel.inline_callback_map
-
-            with lock:
-                now = time.time()
-                expired = [
-                    k
-                    for k, v in list(cb_map.items())
-                    if v.get("expires_at") and v["expires_at"] < now
-                ]
-                for k in expired:
-                    cb_map.pop(k, None)
-
-                cb_map[tok] = callback_data
-
-        self._callback_tokens = getattr(self, "_callback_tokens", [])
-        self._callback_tokens.append(tok)
+        self._store_callback_data(tok, callback_data, is_kernel_proxy, store_callback)
+        self._track_callback_token(tok)
 
         if allow_user is not None:
             allow_callback_user = getattr(
@@ -917,7 +932,7 @@ class ModuleBase(ABC):
         )
 
     @property
-    def Button(self) -> "ModuleBase.ButtonFactory":
+    def Button(self) -> ModuleBase.ButtonFactory:
         """Access button factory for creating various button types."""
         if not hasattr(self, "_button_factory"):
             button_class = getattr(type(self), "ButtonFactory", None)
@@ -1007,6 +1022,74 @@ class ModuleBase(ABC):
             """Create a switch button."""
             return self._telethon_button.switch_inline(
                 text, query=query, same_peer=same_peer, style=style, icon=icon
+            )
+
+        def input(
+            self,
+            text: str,
+            handler: Callable,
+            *,
+            placeholder: str = "",
+            ttl: int = 900,
+            allow_user: int | list[int] | str | None = None,
+            allow_ttl: int = 100,
+            article: Callable | None = None,
+            data: Any | None = None,
+            icon: int | None = None,
+            style: Any = None,
+        ) -> Any:
+            """Create an "input" button.
+
+            Tapping the button opens the bot's inline mode in the current
+            chat (``same_peer=True``). The user types whatever they want and
+            sends the offered result; the typed text is then delivered to
+            ``handler`` as ``(event, text, data)``, similar to
+            :meth:`ModuleBase.inline_temp`.
+
+            Args:
+                text: Button label.
+                handler: Async callable invoked with ``(event, typed_text,
+                    data)`` (or fewer args, based on its signature) once the
+                    user submits the inline result.
+                placeholder: Optional default text pre-filled in the inline
+                    query, which the user can edit before sending.
+                ttl: How long (seconds) the input handler stays registered.
+                allow_user: User ID, list of IDs, or "all" allowed to submit.
+                    Defaults to the user who pressed the button.
+                allow_ttl: TTL (seconds) for the permission grant.
+                article: Optional callable returning a custom article builder
+                    shown while the user types.
+                data: Optional arbitrary data passed through to ``handler``.
+                icon, style: Passed through to the underlying Telethon button.
+
+            Returns:
+                A ``KeyboardButtonSwitchInline`` button (``same_peer=True``).
+            """
+            user_module = self._outer._get_user_module()
+            if user_module and not hasattr(user_module, "register"):
+                user_module.register = type("RegisterObject", (), {})()
+
+            async def bound_wrapper(
+                event: Event, args: str, cb_data: Any = None
+            ) -> None:
+                _pe = wrap_event_for_module(event, self._outer.name, self._outer.kernel)
+                return await handler(_pe, args, cb_data)
+
+            bound_wrapper.__original__ = handler
+            bound_wrapper.__bound_instance__ = self._outer
+
+            temp_uuid = self._outer.kernel.register.inline_temp(
+                bound_wrapper,
+                ttl=ttl,
+                article=article,
+                data=data,
+                allow_user=allow_user,
+                allow_ttl=allow_ttl,
+            )
+
+            query = f"{temp_uuid} {placeholder}" if placeholder else f"{temp_uuid} "
+            return self._telethon_button.switch_inline(
+                text, query=query, same_peer=True, style=style, icon=icon
             )
 
         def copy(
@@ -1264,7 +1347,7 @@ class ModuleBase(ABC):
             if name.endswith(".py"):
                 name = name[:-3]
             elif not name:
-                name = "xlib"
+                return None
 
         try:
             valid, error = validate_remote_url(url)

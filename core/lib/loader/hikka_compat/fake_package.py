@@ -663,53 +663,49 @@ def _ensure_herokutl_stub() -> None:
 
     errors_mod = types.ModuleType("herokutl.errors")
     errors_mod.__path__ = []
-
-    class WebpageMediaEmptyError(Exception):
-        pass
-
-    class MediaCaptionTooLongError(Exception):
-        pass
-
-    class MessageIdInvalidError(Exception):
-        pass
-
-    class YouBlockedUserError(Exception):
-        pass
-
-    class PasswordHashInvalidError(Exception):
-        pass
-
-    class PhoneCodeExpiredError(Exception):
-        pass
-
-    class PhoneCodeInvalidError(Exception):
-        pass
-
-    class PhoneNumberInvalidError(Exception):
-        pass
-
-    class SessionPasswordNeededError(Exception):
-        pass
-
-    errors_mod.WebpageMediaEmptyError = WebpageMediaEmptyError
-    errors_mod.MediaCaptionTooLongError = MediaCaptionTooLongError
-    errors_mod.MessageIdInvalidError = MessageIdInvalidError
-    errors_mod.YouBlockedUserError = YouBlockedUserError
-    errors_mod.PasswordHashInvalidError = PasswordHashInvalidError
-    errors_mod.PhoneCodeExpiredError = PhoneCodeExpiredError
-    errors_mod.PhoneCodeInvalidError = PhoneCodeInvalidError
-    errors_mod.PhoneNumberInvalidError = PhoneNumberInvalidError
-    errors_mod.SessionPasswordNeededError = SessionPasswordNeededError
-    errors_mod.FloodWaitError = FloodWaitError
     errors_mod.__package__ = "herokutl"
+
+    def _copy_module_attrs(src, dst):
+        for _attr in dir(src):
+            if not _attr.startswith("_"):
+                try:
+                    setattr(dst, _attr, getattr(src, _attr))
+                except Exception:
+                    pass
 
     errors_common_mod = types.ModuleType("herokutl.errors.common")
     errors_common_mod.ScamDetectionError = ScamDetectionError
 
     errors_rpc_mod = types.ModuleType("herokutl.errors.rpcerrorlist")
-    errors_rpc_mod.MediaCaptionTooLongError = MediaCaptionTooLongError
-    errors_rpc_mod.MessageIdInvalidError = MessageIdInvalidError
-    errors_rpc_mod.YouBlockedUserError = YouBlockedUserError
+    try:
+        import herokutl.errors.rpcerrorlist as _real_rpc
+
+        _copy_module_attrs(_real_rpc, errors_rpc_mod)
+    except ImportError:
+
+        class _Err(Exception):
+            pass
+
+        for _name in (
+            "MediaCaptionTooLongError",
+            "MessageIdInvalidError",
+            "YouBlockedUserError",
+            "ChannelPrivateError",
+            "ChatAdminRequiredError",
+            "UserNotParticipantError",
+            "PasswordHashInvalidError",
+            "PhoneCodeExpiredError",
+            "PhoneCodeInvalidError",
+            "PhoneNumberInvalidError",
+            "SessionPasswordNeededError",
+        ):
+            setattr(errors_rpc_mod, _name, type(_name, (_Err,), {}))
+
+    errors_mod.ScamDetectionError = ScamDetectionError
+    errors_mod.FloodWaitError = FloodWaitError
+    for _attr in dir(errors_rpc_mod):
+        if not _attr.startswith("_"):
+            setattr(errors_mod, _attr, getattr(errors_rpc_mod, _attr))
 
     extensions_mod = types.ModuleType("herokutl.extensions")
     extensions_mod.__path__ = []
@@ -793,24 +789,29 @@ def _ensure_herokutl_stub() -> None:
     def _request_type(name: str, constructor_id: int):
         return type(name, (TLRequest,), {"CONSTRUCTOR_ID": constructor_id})
 
-    for _name in (
-        "Message",
-        "Channel",
-        "User",
-        "TextWithEntities",
-        "DialogFilter",
-        "PeerUser",
-        "PeerChat",
-        "PeerChannel",
-        "ForumTopic",
-        "ForumTopicDeleted",
-        "InputPeerNotifySettings",
-        "UpdateNewChannelMessage",
-        "DialogFilterDefault",
-        "ChatParticipantAdmin",
-        "ChatParticipantCreator",
-    ):
-        tl_types.__dict__[_name] = type(_name, (_Base,), {})
+    try:
+        import telethon.tl.types as _real_tl_types
+
+        _copy_module_attrs(_real_tl_types, tl_types)
+    except ImportError:
+        for _name in (
+            "Message",
+            "Channel",
+            "User",
+            "TextWithEntities",
+            "DialogFilter",
+            "PeerUser",
+            "PeerChat",
+            "PeerChannel",
+            "ForumTopic",
+            "ForumTopicDeleted",
+            "InputPeerNotifySettings",
+            "UpdateNewChannelMessage",
+            "DialogFilterDefault",
+            "ChatParticipantAdmin",
+            "ChatParticipantCreator",
+        ):
+            tl_types.__dict__[_name] = type(_name, (_Base,), {})
 
     tl_types.InputMediaWebPage = InputMediaWebPage
 
@@ -826,50 +827,36 @@ def _ensure_herokutl_stub() -> None:
 
     tl_functions = types.ModuleType("herokutl.tl.functions")
     tl_functions.__path__ = []
-    tl_func_channels = types.ModuleType("herokutl.tl.functions.channels")
-    tl_func_contacts = types.ModuleType("herokutl.tl.functions.contacts")
-    tl_func_messages = types.ModuleType("herokutl.tl.functions.messages")
-    tl_func_account = types.ModuleType("herokutl.tl.functions.account")
     tl_tlobject_mod = types.ModuleType("herokutl.tl.tlobject")
     tl_tlobject_mod.TLObject = TLObject
     tl_tlobject_mod.TLRequest = TLRequest
 
-    for _name in (
-        "ToggleForumRequest",
-        "JoinChannelRequest",
-        "CreateChannelRequest",
-        "EditPhotoRequest",
-    ):
-        tl_func_channels.__dict__[_name] = _request_type(
-            _name,
-            abs(hash(f"channels.{_name}")) % (2**31),
-        )
+    def _make_func_module(fullname, telethon_path):
+        mod = types.ModuleType(fullname)
+        try:
+            import importlib
 
-    for _name in (
-        "CreateForumTopicRequest",
-        "EditForumTopicRequest",
-        "GetDialogFiltersRequest",
-        "GetForumTopicsByIDRequest",
-        "GetForumTopicsRequest",
-        "SetHistoryTTLRequest",
-        "UpdateDialogFilterRequest",
-        "GetFullChatRequest",
-        "ImportChatInviteRequest",
-        "SendReactionRequest",
-    ):
-        tl_func_messages.__dict__[_name] = _request_type(
-            _name,
-            abs(hash(f"messages.{_name}")) % (2**31),
-        )
+            _real = importlib.import_module(telethon_path)
+            _copy_module_attrs(_real, mod)
+        except ImportError:
+            pass
+        return mod
 
-    tl_func_contacts.UnblockRequest = _request_type(
-        "UnblockRequest",
-        abs(hash("contacts.UnblockRequest")) % (2**31),
+    tl_func_messages = _make_func_module(
+        "herokutl.tl.functions.messages",
+        "telethon.tl.functions.messages",
     )
-
-    tl_func_account.UpdateNotifySettingsRequest = _request_type(
-        "UpdateNotifySettingsRequest",
-        abs(hash("account.UpdateNotifySettingsRequest")) % (2**31),
+    tl_func_channels = _make_func_module(
+        "herokutl.tl.functions.channels",
+        "telethon.tl.functions.channels",
+    )
+    tl_func_contacts = _make_func_module(
+        "herokutl.tl.functions.contacts",
+        "telethon.tl.functions.contacts",
+    )
+    tl_func_account = _make_func_module(
+        "herokutl.tl.functions.account",
+        "telethon.tl.functions.account",
     )
 
     tl_functions.channels = tl_func_channels
@@ -1049,6 +1036,8 @@ def _ensure_fake_package() -> str:
                 )
             parent_mod.validators = _validators_mod
             sys.modules.setdefault(f"{_FAKE_PKG_NAME}.validators", _validators_mod)
+        elif f"{_FAKE_PKG_NAME}.validators" not in sys.modules:
+            sys.modules[f"{_FAKE_PKG_NAME}.validators"] = parent_mod.validators
 
         return _FAKE_PKG_NAME
 
@@ -1497,6 +1486,7 @@ def _ensure_fake_package() -> str:
     sys.modules[f"{_FAKE_PKG_NAME}.inline.utils"] = inline_utils_mod
     sys.modules[f"{_FAKE_PKG_NAME}.validators"] = validators_mod
     sys.modules[f"{_FAKE_PKG_NAME}.strings"] = strings_mod
+    sys.modules["heroku"].validators = validators_mod
     _install_extended_submodules(_FAKE_PKG_NAME, parent)
 
     return _FAKE_PKG_NAME
@@ -1993,7 +1983,7 @@ async def load_hikka_module(
         del sys.modules[child_pkg]
         return False, f"Error instantiating {cls.__name__}: {e}", {}
 
-    instance._mcub_bind(kernel, module_type)
+    instance._mcub_bind(kernel, module_type, module_name=module_name)
 
     db_proxy = getattr(instance, "db", None)
     if db_proxy is not None and getattr(kernel, "db_manager", None):

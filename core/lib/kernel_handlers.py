@@ -8,7 +8,12 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from core.lib.types.event import Event
+
+if TYPE_CHECKING:
+    pass
 
 try:
     from telethon import events
@@ -46,6 +51,18 @@ class KernelHandlersMixin:
         for event_obj, callback in reversed(builders):
             event_type = type(event_obj).__name__
             if event_type not in dedupe_types:
+                continue
+            # Never dedupe the central command handler.
+            # Use == not is because bound-method objects from .watcher_message_handler
+            # produce a new object on each access, even though they refer to the
+            # same underlying function + instance.
+            _core_handler = getattr(self, "_core_message_handler", None)
+            _core_fallback = getattr(self, "_core_fallback_message_handler", None)
+            if _core_handler is not None and callback == _core_handler:
+                seen.add(self._event_builder_signature(event_obj, callback))
+                continue
+            if _core_fallback is not None and callback == _core_fallback:
+                seen.add(self._event_builder_signature(event_obj, callback))
                 continue
             signature = self._event_builder_signature(event_obj, callback)
             if signature in seen:
@@ -137,26 +154,28 @@ class KernelHandlersMixin:
                 has_edit,
                 before_rebind,
             )
-            self.client.remove_event_handler(
-                self._core_message_handler, events.NewMessage()
-            )
-            if hasattr(self, "_core_fallback_message_handler"):
-                self.client.remove_event_handler(
-                    self._core_fallback_message_handler, events.NewMessage()
-                )
-            self.client.remove_event_handler(
-                self._core_message_handler, events.MessageEdited()
-            )
-            self.client.add_event_handler(
-                self._core_message_handler, events.NewMessage()
-            )
-            if hasattr(self, "_core_fallback_message_handler"):
-                self.client.add_event_handler(
-                    self._core_fallback_message_handler, events.NewMessage()
-                )
-            self.client.add_event_handler(
-                self._core_message_handler, events.MessageEdited()
-            )
+
+            # Purge ALL existing core handler bindings from builders directly
+            # to avoid bound-method identity issues with remove_event_handler.
+            _handler = self._core_message_handler
+            _fallback = getattr(self, "_core_fallback_message_handler", None)
+            _handlers_to_purge = {_handler}
+            if _fallback is not None:
+                _handlers_to_purge.add(_fallback)
+            if hasattr(self.client, "_event_builders"):
+                self.client._event_builders = [
+                    (ev, cb)
+                    for ev, cb in self.client._event_builders
+                    if not any(cb == h for h in _handlers_to_purge)
+                ]
+
+            self.client.add_event_handler(_handler, events.NewMessage())
+            # _fallback is always the same bound method as _handler in all
+            # current kernels — only add it when they genuinely differ.
+            if _fallback is not None and _fallback != _handler:
+                self.client.add_event_handler(_fallback, events.NewMessage())
+            self.client.add_event_handler(_handler, events.MessageEdited())
+
             self.logger.debug(
                 "[core_handlers] force-rebind-done reason=%r "
                 "builders_before=%r builders_after=%r",
@@ -462,7 +481,7 @@ class KernelHandlersMixin:
         """Decorator alias for request middleware registration."""
         return self.add_request_middleware(middleware_func)
 
-    async def process_with_middleware(self, event: Any, handler: Callable) -> Any:
+    async def process_with_middleware(self, event: Event, handler: Callable) -> Any:
         """Run event through all middleware, then call handler."""
         if self.client and hasattr(self.client, "_middleware"):
             return await self.client._middleware.process(
