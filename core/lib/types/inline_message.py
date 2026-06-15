@@ -76,9 +76,14 @@ class InlineMessage:
                 if buttons is not None:
                     from telethon import Button as TelethonButton
 
-                    edit_kw["buttons"] = TelethonButton.from_array(
-                        [list(r) if isinstance(r, tuple) else r for r in buttons]
-                    )
+                    if hasattr(TelethonButton, "from_array"):
+                        edit_kw["buttons"] = TelethonButton.from_array(
+                            [list(r) if isinstance(r, tuple) else r for r in buttons]
+                        )
+                    else:
+                        edit_kw["buttons"] = [
+                            list(r) if isinstance(r, tuple) else r for r in buttons
+                        ]
                 edit_kw.update(kwargs)
                 try:
                     await bot_client.edit_message(
@@ -121,9 +126,17 @@ class InlineMessage:
                     if buttons is not None:
                         from telethon import Button as TelethonButton
 
-                        send["buttons"] = TelethonButton.from_array(
-                            [list(r) if isinstance(r, tuple) else r for r in buttons]
-                        )
+                        if hasattr(TelethonButton, "from_array"):
+                            send["buttons"] = TelethonButton.from_array(
+                                [
+                                    list(r) if isinstance(r, tuple) else r
+                                    for r in buttons
+                                ]
+                            )
+                        else:
+                            send["buttons"] = [
+                                list(r) if isinstance(r, tuple) else r for r in buttons
+                            ]
                     if send:
                         client = getattr(k, "client", None)
                         if client is not None:
@@ -149,9 +162,14 @@ class InlineMessage:
             if buttons is not None:
                 from telethon import Button as TelethonButton
 
-                send["buttons"] = TelethonButton.from_array(
-                    [list(r) if isinstance(r, tuple) else r for r in buttons]
-                )
+                if hasattr(TelethonButton, "from_array"):
+                    send["buttons"] = TelethonButton.from_array(
+                        [list(r) if isinstance(r, tuple) else r for r in buttons]
+                    )
+                else:
+                    send["buttons"] = [
+                        list(r) if isinstance(r, tuple) else r for r in buttons
+                    ]
             if send:
                 client = getattr(k, "client", None)
                 if client is not None:
@@ -185,9 +203,14 @@ class InlineMessage:
             if buttons is not None:
                 from telethon import Button as TelethonButton
 
-                send["buttons"] = TelethonButton.from_array(
-                    [list(r) if isinstance(r, tuple) else r for r in buttons]
-                )
+                if hasattr(TelethonButton, "from_array"):
+                    send["buttons"] = TelethonButton.from_array(
+                        [list(r) if isinstance(r, tuple) else r for r in buttons]
+                    )
+                else:
+                    send["buttons"] = [
+                        list(r) if isinstance(r, tuple) else r for r in buttons
+                    ]
             if send:
                 client = getattr(self._kernel, "client", None)
                 if client is not None:
@@ -294,9 +317,14 @@ def _make_form_edit(
             if buttons is not None:
                 from telethon import Button as TelethonButton
 
-                send["buttons"] = TelethonButton.from_array(
-                    [list(b) if isinstance(b, tuple) else b for b in buttons]
-                )
+                if hasattr(TelethonButton, "from_array"):
+                    send["buttons"] = TelethonButton.from_array(
+                        [list(b) if isinstance(b, tuple) else b for b in buttons]
+                    )
+                else:
+                    send["buttons"] = [
+                        list(b) if isinstance(b, tuple) else b for b in buttons
+                    ]
             if send:
                 try:
                     await kernel.client(EditInlineBotMessageRequest(**send))
