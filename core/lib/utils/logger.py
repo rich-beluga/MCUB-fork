@@ -585,6 +585,33 @@ class KernelLogger:
         if cache:
             cache.set(f"mute:{error_type}:{source}", True, ttl=ttl)
 
+    def _store_mute_target(self, error_type: str, source: str) -> str | None:
+        """Store full mute target and return a callback-safe token."""
+        cache = self.cache
+        if not cache:
+            return None
+        token = uuid.uuid4().hex[:12]
+        cache.set(
+            f"mute_target:{token}",
+            {"error_type": error_type, "source": source},
+            ttl=_TRACE_CACHE_TTL,
+        )
+        return token
+
+    def get_mute_target(self, token: str) -> dict[str, str] | None:
+        """Return a cached mute target created for an inline button."""
+        cache = self.cache
+        if not cache:
+            return None
+        payload = cache.get(f"mute_target:{token}")
+        if not isinstance(payload, dict):
+            return None
+        error_type = str(payload.get("error_type") or "")
+        source = str(payload.get("source") or "")
+        if not error_type or not source:
+            return None
+        return {"error_type": error_type, "source": source}
+
     def _get_lifetime_info(self, sig_key: str) -> str:
         """Return an HTML blockquote showing first-seen time and occurrence count.
 
@@ -771,14 +798,15 @@ class KernelLogger:
                 )
 
         if error_type and source:
-            short_source = source[:50] if len(source) > 50 else source
-            buttons.append(
-                Button.inline(
-                    "Mute 1h",
-                    data=f"mute_err:{error_type}:{short_source}",
-                    icon=5451959871257713464,
+            mute_token = self._store_mute_target(error_type, source)
+            if mute_token:
+                buttons.append(
+                    Button.inline(
+                        "Mute 1h",
+                        data=f"mute_err:{mute_token}",
+                        icon=5451959871257713464,
+                    )
                 )
-            )
 
         safe_body = mask_sensitive_data(body)
 
