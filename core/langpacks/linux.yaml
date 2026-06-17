@@ -41,6 +41,7 @@ core_inline:
   command: cmd
   execute: exec()
   no_commands: "ls: cannot access '/proc/cmds': No such file or directory"
+  inline_command_no_access: "command <code>{cmd}</code>: Permission denied"
   form_not_found: "ENOENT: No such file or directory (TTL=0)"
   form_id: inode
   error: "[STDERR]"
@@ -1099,6 +1100,13 @@ trusted:
   percmd_title: "🔐 <b>ACL cmds for {user}</b>"
   percmd_back: "← cd .."
   btn_cmds: "📋 ls /cmds"
+  btn_inline_cmds: "📋 ls /inline-cmds"
+  inlinecmd_title: "📋 <b>Inline ACL for {user}</b>"
+  inlinecmd_empty: "No inline commands"
+  inlinesec_usage: '<tg-emoji emoji-id="5409117246062625941">⚙️</tg-emoji> Usage: <code>.inlinesec</code> (reply, @username or UID) [inline_command]'
+  inlinesec_not_found: 'inline command <code>{cmd}</code>: ENOENT'
+  inlinesec_allowed: '✅ chmod +x <code>{cmd}</code> for {user}'
+  inlinesec_denied: '🚫 chmod -x <code>{cmd}</code> for {user}'
   trust_time_title: '<tg-emoji emoji-id="5409117246062625941">⚙️</tg-emoji> <b>Add user with TTL?</b>'
   trust_time_desc: '<tg-emoji emoji-id="5116275208906343429">‼️</tg-emoji> "cron: deluser from sudoers after {time}."'
   btn_1h: 1h

@@ -47,6 +47,7 @@ core_inline:
   command: Command
   execute: Execute
   no_commands: No registered inline commands
+  inline_command_no_access: Command <code>{cmd}</code> is unavailable
   form_not_found: Form not found or expired
   form_id: ID
   error: Inline query error
@@ -1209,6 +1210,13 @@ trusted:
   percmd_title: "🔐 <b>Commands for {user}</b>"
   percmd_back: "← Back"
   btn_cmds: "📋 Commands"
+  btn_inline_cmds: "📋 Inline cmds"
+  inlinecmd_title: "📋 <b>Inline commands for {user}</b>"
+  inlinecmd_empty: "No inline commands"
+  inlinesec_usage: '<tg-emoji emoji-id="5409117246062625941">⚙️</tg-emoji> Usage: <code>.inlinesec</code> (reply, @username or ID) [inline_command]'
+  inlinesec_not_found: 'Inline command <code>{cmd}</code> not found.'
+  inlinesec_allowed: '✅ <code>{cmd}</code> allowed for {user}'
+  inlinesec_denied: '🚫 <code>{cmd}</code> denied for {user}'
   trust_time_title: '<tg-emoji emoji-id="5409117246062625941">⚙️</tg-emoji> <b>Add user for a limited time?</b>'
   trust_time_desc: '<tg-emoji emoji-id="5116275208906343429">‼️</tg-emoji> User will be removed from trusted after {time}.'
   btn_1h: 1 hour
