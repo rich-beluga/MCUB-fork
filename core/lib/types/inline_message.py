@@ -10,6 +10,56 @@ if TYPE_CHECKING:
     pass
 
 
+def _normalize_inline_message_id(value: Any) -> Any:
+    """Return a Telethon InputBotInlineMessageID-like object when possible.
+
+    Telethon ``UpdateBotInlineSend.msg_id`` is already an
+    ``InputBotInlineMessageID``/``InputBotInlineMessageID64`` object. Older MCUB
+    code may store it as ``"dc_id:id:access_hash"``; convert that string back
+    before passing it to ``messages.EditInlineBotMessageRequest(id=...)``.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return value
+    parts = value.split(":")
+    if len(parts) < 3:
+        return value
+    try:
+        dc_id, msg_id, access_hash = (int(parts[0]), int(parts[1]), int(parts[2]))
+    except (TypeError, ValueError):
+        return value
+    try:
+        from telethon.tl.types import InputBotInlineMessageID64
+
+        return InputBotInlineMessageID64(
+            dc_id=dc_id,
+            owner_id=0,
+            id=msg_id,
+            access_hash=access_hash,
+        )
+    except (ImportError, TypeError):
+        from telethon.tl.types import InputBotInlineMessageID
+
+        return InputBotInlineMessageID(
+            dc_id=dc_id,
+            id=msg_id,
+            access_hash=access_hash,
+        )
+
+
+def _serialize_inline_message_id(value: Any) -> Any:
+    """Serialize Telethon inline message id for cache/storage."""
+    if value is None or isinstance(value, str):
+        return value
+    dc_id = getattr(value, "dc_id", None)
+    msg_id = getattr(value, "id", None)
+    access_hash = getattr(value, "access_hash", None)
+    if dc_id is None or msg_id is None or access_hash is None:
+        return value
+    return f"{dc_id}:{msg_id}:{access_hash}"
+
+
 class InlineMessage:
     """Native MCUB inline message with edit/delete/answer API.
 
@@ -35,10 +85,20 @@ class InlineMessage:
         self._event = event
         self._kernel = kernel
         self.data: bytes = getattr(event, "data", b"")
-        self.inline_message_id = getattr(event, "inline_message_id", None) or getattr(
-            event, "_inline_msg_id", None
+        self.inline_message_id = _serialize_inline_message_id(
+            getattr(event, "inline_message_id", None)
+            or getattr(event, "_inline_msg_id", None)
+            or getattr(event, "msg_id", None)
         )
         self.unit_id = unit_id or getattr(event, "unit_id", "")
+        if self.inline_message_id is None and self.unit_id and kernel is not None:
+            cache = getattr(kernel, "cache", None)
+            if cache is not None:
+                form_data = cache.get(self.unit_id) or cache.get(f"msg_{self.unit_id}")
+                if form_data:
+                    self.inline_message_id = _serialize_inline_message_id(
+                        form_data.get("inline_message_id")
+                    )
         self.chat_id = getattr(event, "chat_id", None)
         self.message_id = (
             getattr(event, "message_id", None)
@@ -110,15 +170,8 @@ class InlineMessage:
                     from telethon.tl.functions.messages import (
                         EditInlineBotMessageRequest,
                     )
-                    from telethon.tl.types import InputBotInlineMessageID
 
-                    if isinstance(imid, str) and ":" in imid:
-                        parts = imid.split(":")
-                        imid = InputBotInlineMessageID(
-                            dc_id=int(parts[0]) if len(parts) > 0 else 0,
-                            id=int(parts[1]) if len(parts) > 1 else 0,
-                            access_hash=int(parts[2]) if len(parts) > 2 else 0,
-                        )
+                    imid = _normalize_inline_message_id(imid)
                     send = {}
                     if text is not None:
                         send["message"] = text
@@ -140,21 +193,14 @@ class InlineMessage:
                     if send:
                         client = getattr(k, "client", None)
                         if client is not None:
-                            await client(EditInlineBotMessageRequest(peer=imid, **send))
+                            await client(EditInlineBotMessageRequest(id=imid, **send))
                     return self
 
         imid = self.inline_message_id
         if imid is not None and k is not None:
             from telethon.tl.functions.messages import EditInlineBotMessageRequest
-            from telethon.tl.types import InputBotInlineMessageID
 
-            if isinstance(imid, str) and ":" in imid:
-                parts = imid.split(":")
-                imid = InputBotInlineMessageID(
-                    dc_id=int(parts[0]) if len(parts) > 0 else 0,
-                    id=int(parts[1]) if len(parts) > 1 else 0,
-                    access_hash=int(parts[2]) if len(parts) > 2 else 0,
-                )
+            imid = _normalize_inline_message_id(imid)
             send = {}
             if text is not None:
                 send["message"] = text
@@ -173,48 +219,7 @@ class InlineMessage:
             if send:
                 client = getattr(k, "client", None)
                 if client is not None:
-                    await client(EditInlineBotMessageRequest(peer=imid, **send))
-            return self
-
-        kwargs.setdefault("parse_mode", parse_mode)
-        if text is not None:
-            kwargs["text"] = text
-        if buttons is not None:
-            kwargs["buttons"] = buttons
-        await self._event.edit(**kwargs)
-        return self
-
-        imid = self.inline_message_id
-        if imid is not None and self._kernel is not None:
-            from telethon.tl.functions.messages import EditInlineBotMessageRequest
-            from telethon.tl.types import InputBotInlineMessageID
-
-            if isinstance(imid, str) and ":" in imid:
-                parts = imid.split(":")
-                imid = InputBotInlineMessageID(
-                    dc_id=int(parts[0]) if len(parts) > 0 else 0,
-                    id=int(parts[1]) if len(parts) > 1 else 0,
-                    access_hash=int(parts[2]) if len(parts) > 2 else 0,
-                )
-            send = {}
-            if text is not None:
-                send["message"] = text
-                send["parse_mode"] = parse_mode
-            if buttons is not None:
-                from telethon import Button as TelethonButton
-
-                if hasattr(TelethonButton, "from_array"):
-                    send["buttons"] = TelethonButton.from_array(
-                        [list(r) if isinstance(r, tuple) else r for r in buttons]
-                    )
-                else:
-                    send["buttons"] = [
-                        list(r) if isinstance(r, tuple) else r for r in buttons
-                    ]
-            if send:
-                client = getattr(self._kernel, "client", None)
-                if client is not None:
-                    await client(EditInlineBotMessageRequest(peer=imid, **send))
+                    await client(EditInlineBotMessageRequest(id=imid, **send))
             return self
 
         kwargs.setdefault("parse_mode", parse_mode)
@@ -238,7 +243,7 @@ class InlineMessage:
 
                     await self._kernel.client(
                         EditInlineBotMessageRequest(
-                            peer=self.inline_message_id,
+                            id=_normalize_inline_message_id(self.inline_message_id),
                             message="",
                         )
                     )
@@ -327,7 +332,11 @@ def _make_form_edit(
                     ]
             if send:
                 try:
-                    await kernel.client(EditInlineBotMessageRequest(**send))
+                    await kernel.client(
+                        EditInlineBotMessageRequest(
+                            id=_normalize_inline_message_id(inline_msg_id), **send
+                        )
+                    )
                 except Exception:
                     pass
 
@@ -350,7 +359,7 @@ def _make_form_delete(
         try:
             await kernel.client(
                 EditInlineBotMessageRequest(
-                    peer=inline_msg_id,
+                    id=_normalize_inline_message_id(inline_msg_id),
                     message="",
                 )
             )
