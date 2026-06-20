@@ -1098,7 +1098,7 @@ def register(kernel: Kernel_type) -> None:
 
         await get_user_display(user_id)
 
-        async def _finish_add(uid, add_nonick, timed=False, seconds=0):
+        async def _finish_add(event, uid, add_nonick, timed=False, seconds=0):
             trusted = await get_trusted_list()
             if uid not in trusted:
                 trusted.append(uid)
@@ -1133,7 +1133,7 @@ def register(kernel: Kernel_type) -> None:
                 )
 
         if force_flg and nonick_flg:
-            await _finish_add(user_id, True)
+            await _finish_add(event, user_id, True)
             return
 
         async def on_time_select(cb_event, uid, seconds, auto_nonick=False):
@@ -1142,7 +1142,7 @@ def register(kernel: Kernel_type) -> None:
                 return
             if auto_nonick:
                 if seconds == 0:
-                    await _finish_add(uid, True)
+                    await _finish_add(cb_event, uid, True)
                 else:
                     import time
 
@@ -1150,7 +1150,7 @@ def register(kernel: Kernel_type) -> None:
                     expired = await get_expired_trusted()
                     expired[str(uid)] = expiry
                     await save_expired_trusted(expired)
-                    await _finish_add(uid, True, timed=True, seconds=seconds)
+                    await _finish_add(cb_event, uid, True, timed=True, seconds=seconds)
             elif seconds == 0:
                 await _show_nonick_step(cb_event, uid)
             else:
@@ -1223,7 +1223,7 @@ def register(kernel: Kernel_type) -> None:
             if cb_event.sender_id != kernel.ADMIN_ID:
                 await cb_event.answer()
                 return
-            await _finish_add(uid, nonick, timed=timed, seconds=seconds)
+            await _finish_add(cb_event, uid, nonick, timed=timed, seconds=seconds)
 
         def _format_duration(seconds: int) -> str:
             if seconds >= 86400:
