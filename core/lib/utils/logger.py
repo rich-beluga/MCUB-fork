@@ -420,12 +420,11 @@ def setup_logging() -> logging.Logger:
     os.makedirs(_LOG_DIR, exist_ok=True)
 
     root_logger = logging.getLogger()
-    kernel_logger = logging.getLogger("kernel")
-    mcub_logger = logging.getLogger("mcub")
-
     root_logger.setLevel(logging.DEBUG)
+    kernel_logger = logging.getLogger("kernel")
+    logging.getLogger("mcub").setLevel(logging.DEBUG)
+
     kernel_logger.setLevel(logging.DEBUG)
-    mcub_logger.setLevel(logging.DEBUG)
 
     log_path = os.path.abspath(_LOG_FILE)
     handler = None
@@ -471,8 +470,9 @@ def setup_logging() -> logging.Logger:
     telethon_logger.setLevel(logging.WARNING)
     telethon_logger.addFilter(_NoiseFilter())
 
-    aiosqlite_logger = logging.getLogger("aiosqlite")
-    aiosqlite_logger.setLevel(logging.WARNING)
+    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
+
+    logging.getLogger("aiogram").setLevel(logging.INFO)
 
     return kernel_logger
 
