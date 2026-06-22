@@ -409,6 +409,82 @@ class TestInlineFeatures:
 
         assert kernel.inline_handlers["test"] == new_handler
 
+    @pytest.mark.asyncio
+    async def test_marked_hikka_inline_handler_receives_inline_query_args(self):
+        """Marked Hikka inline handlers receive InlineQuery regardless of name."""
+        from core.lib.loader.hikka_compat.fake_package import mark_hikka_inline_handler
+        from core_inline.handlers import InlineHandlers
+
+        seen = {}
+
+        class WikiSearchMod:
+            _hikka_compat = True
+
+        async def random_named_handler(self, query):
+            seen["query"] = query.query
+            seen["args"] = query.args
+            return None
+
+        random_name = "JVIUwqidhfaiwdjifojheiwqahjfuoejwaiuofdhjiuwfasdjfipoejwriohi8wqafhjiuordahs98firuje"
+        setattr(WikiSearchMod, random_name, random_named_handler)
+
+        kernel = MagicMock()
+        method = getattr(WikiSearchMod(), random_name)
+        kernel.inline_handlers = {"wiki": mark_hikka_inline_handler(method)}
+        kernel.logger = MagicMock()
+        kernel._hikka_compat_inline_proxy = None
+
+        handlers = InlineHandlers.__new__(InlineHandlers)
+        handlers.kernel = kernel
+        handlers._inline_manager = SimpleNamespace(
+            is_allowed=AsyncMock(return_value=True)
+        )
+
+        event = SimpleNamespace(
+            sender_id=123,
+            query=SimpleNamespace(query_id="qid", offset=""),
+        )
+
+        handled = await handlers._dispatch_inline_handler("wiki", "wiki heroku", event)
+
+        assert handled is False
+        assert seen == {"query": "wiki heroku", "args": "heroku"}
+
+    @pytest.mark.asyncio
+    async def test_native_suffix_inline_handler_receives_raw_event(self):
+        """Native MCUB handlers may also end with _inline_handler."""
+        from core_inline.handlers import InlineHandlers
+
+        seen = {}
+
+        class NativeLoader:
+            async def _catalog_inline_handler(self, event):
+                seen["event"] = event
+                seen["text"] = event.text
+                return None
+
+        kernel = MagicMock()
+        kernel.inline_handlers = {"catalog": NativeLoader()._catalog_inline_handler}
+        kernel.logger = MagicMock()
+        kernel._hikka_compat_inline_proxy = None
+
+        handlers = InlineHandlers.__new__(InlineHandlers)
+        handlers.kernel = kernel
+        handlers._inline_manager = SimpleNamespace(
+            is_allowed=AsyncMock(return_value=True)
+        )
+
+        event = SimpleNamespace(
+            text="catalog",
+            sender_id=123,
+            query=SimpleNamespace(query_id="qid", offset=""),
+        )
+
+        handled = await handlers._dispatch_inline_handler("catalog", "catalog", event)
+
+        assert handled is False
+        assert seen == {"event": event, "text": "catalog"}
+
 
 class TestInlineParsing:
     """Test inline query parsing"""
