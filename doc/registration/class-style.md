@@ -1,4 +1,4 @@
-# Class-Style Modules v1.0.0
+# Class-Style Modules
 
 ← [Index](../../API_DOC.md)
 
@@ -1075,6 +1075,10 @@ async def cmd_buttons(self, event):
 
 ### Input Button (`Button.input`)
 
+
+<img src='https://x0.at/1zFT.jpg' alt='telegram'>
+
+
 Creates a button that opens the bot's inline mode and prompts the user to type text. When the user sends the inline result, the typed text is delivered to `handler`.
 
 **Handler signature:** `async def handler(self, event, text, data)`
@@ -1084,19 +1088,56 @@ Creates a button that opens the bot's inline mode and prompts the user to type t
 - `data` - passthrough value from the `data=` parameter.
 
 ```python
-@command("ask")
-async def cmd_ask(self, m):
-    btn = self.Button.input(
-        "✍️ Ввecти знaчeниe",
-        self.on_input,
-        placeholder="ввeди cюдa...",
-        allow_user=m.sender_id,
-        data=m.chat_id,
-    )
-    await self.inline(m.chat_id, "Haжми кнoпкy:", buttons=[[btn]])
+import core.lib.loader.module_base as loader
+import core.lib.types as typ
 
-async def on_input(self, event, text, data):
-    self.log.info(f"Пoлyчeнo: {text}, chat_id={data}")
+class MyModule(loader.ModuleBase):
+    name = 'Module'
+
+    def on_load(self):
+        self.banner_url: str | None = None
+        self.message: str | None = None
+
+    @loader.command('ask')
+    async def cmd_ask(self: loader.ModuleBase, event: typ.Event) -> None:
+
+        btn = [
+                 [
+                     self.Button.input("✏️ Message", self.on_input, data=(event.chat_id, 'message'))
+                 ],
+                 [
+                     self.Button.input('✏️ Banner URL', self.on_input, data=(event.chat_id, 'banner_url'))
+                 ],
+                 [
+                     self.Button.close(event)
+                 ]
+        ]
+
+        await self.inline(
+            event.chat_id,
+            'Menu',
+            buttons=btn
+        )
+
+
+    async def on_input(self: loader.ModuleBase, event: typ.InlineMessage, args, data=None) -> None:
+        if data:
+
+            chat_id, message = data
+
+            match message:
+                case 'message':
+                    await self.client.send_message(
+                        chat_id,
+                        f'key {message}, args: {args}'
+                    )
+                    self.message = args
+                case 'banner_url':
+                    await self.client.send_message(
+                        chat_id,
+                        f'key {message}, args'
+                    )
+                    self.message = args
 ```
 
 How it works:
