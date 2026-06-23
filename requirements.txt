@@ -830,7 +830,7 @@ rsa==4.9.1 \
 socks==0 \
     --hash=sha256:727e9b4620730601c0360a00c7f4ae26295146c0a91af173bd155cc991edf765
     # via -r requirements.in
-telethon-mcub==1.43.15 \
+telethon-mcub==1.44.0 \
     --hash=sha256:4775a85256bb6666a4c10683d3532be3ab352846ea84de8baec094e7bfe0469a \
     --hash=sha256:900fdef6e18e682736ce857e6d851702bd46a71e72c35d9d696d77986292339b
     # via -r requirements.in
