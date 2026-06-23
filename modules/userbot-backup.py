@@ -127,6 +127,8 @@ _E: dict[str, str] = {
     "list": '<tg-emoji emoji-id="5411192149058289173">☁️</tg-emoji>',
 }
 
+_DB_ARCHIVE_FILES = {"userbot.db", "userbot.db-wal", "userbot.db-shm"}
+
 
 class Backup(ModuleBase):
     name = "userbot-backup"
@@ -364,6 +366,14 @@ class Backup(ModuleBase):
                 sources["config.json"] = p
 
         if want_db:
+            db_manager = getattr(self.kernel, "db_manager", None)
+            conn = getattr(db_manager, "conn", None)
+            if conn is not None:
+                try:
+                    await conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                except Exception as e:
+                    self.log.warning(f"Backup DB checkpoint failed: {e}")
+
             api_id = getattr(self.kernel, "API_ID", None)
             api_hash = getattr(self.kernel, "API_HASH", None)
             if api_id and api_hash:
@@ -374,6 +384,10 @@ class Backup(ModuleBase):
                 p = current_dir / "userbot.db"
             if p.exists():
                 sources["userbot.db"] = p
+            for suffix in ("-wal", "-shm"):
+                sidecar = Path(f"{p}{suffix}")
+                if sidecar.exists():
+                    sources[f"userbot.db{suffix}"] = sidecar
 
         if want_modules:
             p = current_dir / "modules_loaded"
@@ -948,24 +962,52 @@ class Backup(ModuleBase):
 
             current_dir = Path.cwd()
             restored: list[str] = []
+            moved_targets: set[Path] = set()
             api_id = getattr(self.kernel, "API_ID", None)
             api_hash = getattr(self.kernel, "API_HASH", None)
 
-            for item in backup_dir.iterdir():
-                if item.name == "userbot.db" and api_id and api_hash:
+            def resolve_restore_target(item_name: str) -> Path:
+                if item_name in _DB_ARCHIVE_FILES and api_id and api_hash:
                     from utils.security import get_db_path
 
-                    target = Path(get_db_path(api_id, api_hash))
-                else:
-                    target = current_dir / item.name
+                    db_path = Path(get_db_path(api_id, api_hash))
+                    if item_name == "userbot.db":
+                        return db_path
+                    suffix = item_name.removeprefix("userbot.db")
+                    return Path(f"{db_path}{suffix}")
+                return current_dir / item_name
 
-                if target.exists():
-                    backup_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    backup_name = f"{target.name}_backup_{backup_time}"
-                    shutil.move(str(target), current_dir / backup_name)
+            def move_existing_target(target: Path) -> str | None:
+                target_key = Path(os.path.abspath(target))
+                if target_key in moved_targets:
+                    return None
+                moved_targets.add(target_key)
+                if not target.exists():
+                    return None
+                backup_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_name = f"{target.name}_backup_{backup_time}"
+                shutil.move(str(target), current_dir / backup_name)
+                return backup_name
+
+            for item in sorted(
+                backup_dir.iterdir(), key=lambda p: (p.name != "userbot.db", p.name)
+            ):
+                target = resolve_restore_target(item.name)
+
+                if item.name == "userbot.db":
+                    for stale_sidecar in (Path(f"{target}-wal"), Path(f"{target}-shm")):
+                        backup_name = move_existing_target(stale_sidecar)
+                        if backup_name:
+                            restored.append(
+                                f"{_E['box']} {stale_sidecar.name} → {backup_name}"
+                            )
+
+                backup_name = move_existing_target(target)
+                if backup_name:
                     restored.append(f"{_E['box']} {item.name} → {backup_name}")
 
                 if item.is_file():
+                    target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(item, target)
                 elif item.is_dir():
                     shutil.copytree(item, target, dirs_exist_ok=True)
