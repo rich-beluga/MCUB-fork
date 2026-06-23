@@ -706,9 +706,8 @@ class Kernel:
             self.client.add_event_handler(_handler, events.NewMessage())
             # _fallback is always the same bound method as _handler in all
             # current kernels - only add it when they genuinely differ.
-            if _fallback is not None and _fallback is not _handler:
+            if _fallback is not None and _fallback != _handler:
                 self.client.add_event_handler(_fallback, events.NewMessage())
-            self.client.add_event_handler(_handler, events.MessageEdited())
             self.client.add_event_handler(_handler, events.MessageEdited())
 
             self.logger.debug(
@@ -1264,7 +1263,7 @@ class Kernel:
         try:
             from core.web.app import start_web_panel
 
-            asyncio.create_task(start_web_panel(self, host, port))
+            self._web_runner = await start_web_panel(self, host, port)
         except Exception as e:
             self.logger.error(f"Failed to start web panel: {e}")
 

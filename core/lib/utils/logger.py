@@ -14,6 +14,7 @@ import re
 import sys
 import traceback
 import uuid
+import weakref
 from collections import deque
 from collections.abc import Awaitable, Callable
 from datetime import datetime
@@ -67,6 +68,7 @@ _TELEGRAM_LOG_BATCH_SIZE = 5
 _TELEGRAM_LOG_BATCH_INTERVAL = 2.0
 _TELEGRAM_LOG_RATE_LIMIT = 10
 _TELEGRAM_LOG_RATE_WINDOW = 60
+_TELEGRAM_LOG_HANDLERS: weakref.WeakSet = weakref.WeakSet()
 
 _NETWORK_ERRORS = (
     TimedOutError,
@@ -514,6 +516,7 @@ def setup_telegram_logging(
         logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
     )
     logger.addHandler(bridge)
+    _TELEGRAM_LOG_HANDLERS.add(handler)
     return handler
 
 
@@ -1198,3 +1201,31 @@ class TelegramLogHandler:
                 text += f"\n<blockquote><code>... and {overflow} more errors</code></blockquote>"
 
         await self._kernel_logger.send_log_message(text)
+
+
+def _flush_log_queue() -> int:
+    """Drain queued Telegram log messages without awaiting network I/O.
+
+    Used by the memory monitor's high-pressure purge path.  The helper is
+    intentionally synchronous because purge_caches() may run outside the
+    TelegramLogHandler worker task and must not block the event loop on sends.
+
+    Returns:
+        Number of queued log messages dropped.
+    """
+    dropped = 0
+    for handler in list(_TELEGRAM_LOG_HANDLERS):
+        queue = getattr(handler, "_queue", None)
+        if queue is None:
+            continue
+
+        while True:
+            try:
+                queue.get_nowait()
+                dropped += 1
+            except asyncio.QueueEmpty:
+                break
+            except Exception:
+                break
+
+    return dropped

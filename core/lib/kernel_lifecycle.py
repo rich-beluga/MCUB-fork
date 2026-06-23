@@ -500,6 +500,15 @@ class KernelLifecycleMixin:
             except Exception:
                 pass
 
+        web_runner = getattr(self, "_web_runner", None)
+        if web_runner is not None:
+            try:
+                await web_runner.cleanup()
+            except Exception:
+                pass
+            finally:
+                self._web_runner = None
+
         if hasattr(self, "bot_client") and self.bot_client:
             try:
                 await self.bot_client.disconnect()
@@ -676,7 +685,7 @@ class KernelLifecycleMixin:
         try:
             from core.web.app import start_web_panel
 
-            _task = asyncio.create_task(start_web_panel(self, host, port))
+            self._web_runner = await start_web_panel(self, host, port)
         except Exception as e:
             self.logger.error(f"Failed to start web panel: {e}")
             await self.handle_error(e, message="Web panel start failed")
