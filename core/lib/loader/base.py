@@ -25,7 +25,6 @@ except ImportError:
 if TYPE_CHECKING:
     from core.lib.types import Kernel
     from core.lib.types.client import Client
-    from core.lib.types.register import register
 
 
 try:
@@ -1100,8 +1099,8 @@ class ModuleBase(ABC):
             text: str | None = None,
             handler: Callable | None = None,
             *,
-            icon: int = None,
-            style: str = None,
+            icon: int | None = None,
+            style: str | None = None,
             allow_user: int | list[int] | str | None = None,
             allow_ttl: int = 100,
         ) -> Any:
@@ -1148,7 +1147,7 @@ class ModuleBase(ABC):
             *,
             payload: bytes | None = None,
             icon: int | None = None,
-            style: str = None,
+            style: str | None = None,
         ) -> Any:
             """Create a copy button."""
             return self._telethon_button.copy(
@@ -1161,7 +1160,7 @@ class ModuleBase(ABC):
             *,
             request_title: str | None = None,
             icon: int | None = None,
-            style: str = None,
+            style: str | None = None,
         ) -> Any:
             """Create a request phone button."""
             return self._telethon_button.request_phone(
@@ -1175,7 +1174,7 @@ class ModuleBase(ABC):
             request_title: str | None = None,
             live_period: int | None = None,
             icon: int | None = None,
-            style: str = None,
+            style: str | None = None,
         ) -> Any:
             """Create a request location button."""
             return self._telethon_button.request_location(
