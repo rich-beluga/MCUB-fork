@@ -529,7 +529,7 @@ class InlineHandlers:
 
     def _get_bot_client_on(self):
         try:
-            on = getattr(self.bot_client, "on")
+            on = self.bot_client.on
         except Exception as e:
             self.kernel.logger.debug(
                 "[InlineHandlers] bot_client.on unavailable: %s", e
