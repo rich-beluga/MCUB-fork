@@ -33,8 +33,8 @@ langbutton:
   btn_en: 🇬🇧 English
 
 core_inline:
-  no_access: У вac нeт дocтyпa к inline MCUB bot
-  no_access_id: 'ID:'
+  no_access: Простите, но у вас нету доступа!
+  no_access_id: 'ID'
   mcub_bot_title: MCUB Bot
   version: Version
   modules: Modules
