@@ -376,7 +376,9 @@ class InlineBot:
                     print(f"\n{R}{s.get('bot_limit_give_up', '')}{RST}\n")
                     return
 
-                msg_key = "bot_limit_warn1" if limit_hit_count == 1 else "bot_limit_warn2"
+                msg_key = (
+                    "bot_limit_warn1" if limit_hit_count == 1 else "bot_limit_warn2"
+                )
                 print(f"\n{Y}{s.get(msg_key, '')}{RST}")
 
                 choice = (
@@ -920,6 +922,8 @@ class InlineBot:
 
             me = await self.bot_client.get_me()
             self.username = me.username
+            self.kernel.inline_bot_user_id = getattr(me, "id", None)
+            self.kernel.inline_bot_username = self.username
             self._persist_credentials()
 
             from .handlers import InlineHandlers

@@ -1574,6 +1574,17 @@ def register(kernel):
         except Exception as e:
             await event.answer(t("error", error=str(e)[:50]), alert=True)
 
+    def fcfg_confirm_article_text(event, confirm_id: str) -> str:
+        btn_id = html.escape(f"fcfg_confirm_{confirm_id}", quote=True)
+        if not getattr(event, "sender_id", False) == getattr(kernel, "ADMIN_ID", False):
+            tip = "\n🗿 <em>The message will not be deleted on its own....</em>"
+        else:
+            tip = "\n⏳ <em>This message will be deleted!</em>"
+        return (
+            f"🎲 <strong><a href='tg://btn/{btn_id}'>"
+            "I send a request to the module...​</a></strong>"
+        ) + tip
+
     async def generate_simple_set_article(
         event,
         key_id,
@@ -1617,7 +1628,7 @@ def register(kernel):
                 id=confirm_id,
                 title=f"✅ Set: {scope_prefix}{key} = {value_str[:50]}",
                 description=f"✅ Set: {scope_prefix}{key} = {value_str[:50]}",
-                text=t("fcfg_confirm_text"),
+                text=fcfg_confirm_article_text(event, confirm_id),
                 parse_mode="html",
             )
 
@@ -1669,7 +1680,7 @@ def register(kernel):
                     id=confirm_id,
                     title=t("list_add_confirm", value=value_str[:50]),
                     description=t("list_add_confirm", value=value_str[:50]),
-                    text=t("fcfg_confirm_text"),
+                    text=fcfg_confirm_article_text(event, confirm_id),
                     parse_mode="html",
                 )
 
@@ -1718,7 +1729,7 @@ def register(kernel):
                     description=t(
                         "dict_add_confirm", key=subkey, value=dict_value_str[:30]
                     ),
-                    text=t("fcfg_confirm_text"),
+                    text=fcfg_confirm_article_text(event, confirm_id),
                     parse_mode="html",
                 )
 
@@ -1772,7 +1783,7 @@ def register(kernel):
                     description=t(
                         "list_remove_confirm", index=index, value=str(item)[:50]
                     ),
-                    text=t("fcfg_confirm_text"),
+                    text=fcfg_confirm_article_text(event, confirm_id),
                     parse_mode="html",
                 )
                 builders.append(builder)
@@ -1811,7 +1822,7 @@ def register(kernel):
                     id=confirm_id,
                     title=t("dict_remove_confirm", key=subkey),
                     description=f"Знaчeниe: {str(value)[:50]}...",
-                    text=t("fcfg_confirm_text"),
+                    text=fcfg_confirm_article_text(event, confirm_id),
                     parse_mode="html",
                 )
                 builders.append(builder)
@@ -1884,7 +1895,7 @@ def register(kernel):
                             old=str(item)[:30],
                             new=value_str[:30],
                         ),
-                        text=t("fcfg_confirm_text"),
+                        text=fcfg_confirm_article_text(event, confirm_id),
                         parse_mode="html",
                     )
                     builders.append(builder)
@@ -1935,7 +1946,7 @@ def register(kernel):
                             old=str(old_value)[:30],
                             new=value_str[:30],
                         ),
-                        text=t("fcfg_confirm_text"),
+                        text=fcfg_confirm_article_text(event, confirm_id),
                         parse_mode="html",
                     )
                     builders.append(builder)
