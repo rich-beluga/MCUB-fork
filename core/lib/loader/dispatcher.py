@@ -196,9 +196,9 @@ class CommandDispatcher:
         if depth > 5:
             self.logger.error(
                 "[process_command] alias recursion limit reached: %r",
-                getattr(event, "text", None),
+                getattr(event, "raw_text", None),
             )
-            await self.kernel.log_error_async(
+            await self.kernel.logger.info(
                 f"Alias recursion limit reached: {event.text}"
             )
             return False
@@ -292,7 +292,7 @@ class CommandDispatcher:
         Resolves aliases, wraps the event for the owning module and
         calls the handler.
         """
-        text = getattr(event, "text", "") or ""
+        text = getattr(event, "raw_text", "") or ""
 
         # Guarantee pipeline attributes exist
         for attr_name, default in (

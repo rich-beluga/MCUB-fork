@@ -486,6 +486,126 @@ class TestInlineFeatures:
         assert seen == {"event": event, "text": "catalog"}
 
 
+class TestInlineButtonCleanupWatcher:
+    class _Cache:
+        def __init__(self, values=None):
+            self.values = values or {}
+
+        def get(self, key):
+            return self.values.get(key)
+
+    class _Register:
+        def __init__(self):
+            self.handlers = []
+            self.keys = set()
+
+        def watcher(self, func=None, module=None, **_tags):
+            def decorator(f):
+                key = (getattr(module, "__name__", ""), f.__name__)
+                if key not in self.keys:
+                    self.keys.add(key)
+                    self.handlers.append(f)
+                return f
+
+            return decorator(func) if func is not None else decorator
+
+    def _handlers(self, *, cache=None, inline_bot_user_id=777):
+        from core_inline.handlers import InlineHandlers
+
+        handlers = InlineHandlers.__new__(InlineHandlers)
+        handlers.kernel = SimpleNamespace(
+            cache=cache or self._Cache(),
+            register=self._Register(),
+            inline_bot_user_id=inline_bot_user_id,
+            config={},
+            logger=MagicMock(),
+        )
+        return handlers
+
+    def test_extracts_text_url_btn_targets(self):
+        from telethon.tl.types import MessageEntityTextUrl
+
+        handlers = self._handlers()
+        message = SimpleNamespace(
+            entities=[
+                MessageEntityTextUrl(offset=5, length=3, url="tg://btn/form_test"),
+                MessageEntityTextUrl(offset=9, length=4, url="https://example.com"),
+            ]
+        )
+
+        assert handlers._extract_btn_form_ids(message) == ["form_test"]
+
+    def test_checks_form_and_inline_temp_targets(self):
+        handlers = self._handlers(cache=self._Cache({"form_test": {"text": "ok"}}))
+        assert handlers._inline_btn_target_exists("form_test") is True
+
+        handlers = self._handlers(
+            cache=self._Cache({"inline_temp_tmpid": {"handler": object()}})
+        )
+        assert handlers._inline_btn_target_exists("tmpid") is True
+
+    @pytest.mark.asyncio
+    async def test_cleanup_watcher_deletes_admin_message_from_runtime_bot(self):
+        from telethon.tl.types import MessageEntityTextUrl
+
+        handlers = self._handlers(cache=self._Cache({"form_test": {"text": "ok"}}))
+        handlers.kernel.ADMIN_ID = 1
+        handlers._setup_inline_button_cleanup_watcher()
+
+        event = SimpleNamespace(
+            sender_id=1,
+            message=SimpleNamespace(
+                entities=[MessageEntityTextUrl(5, 3, "tg://btn/form_test")],
+                via_bot_id=777,
+            ),
+            delete=AsyncMock(),
+        )
+
+        await handlers.kernel.register.handlers[0](event)
+
+        event.delete.assert_awaited_once()
+
+    def test_cleanup_watcher_registers_only_once(self):
+        handlers = self._handlers(cache=self._Cache({"form_test": {"text": "ok"}}))
+
+        handlers._setup_inline_button_cleanup_watcher()
+        handlers._setup_inline_button_cleanup_watcher()
+
+        assert len(handlers.kernel.register.handlers) == 1
+
+    def test_bot_client_proxy_does_not_probe_on_attribute(self):
+        class ClientProxy:
+            @property
+            def on(self):  # pragma: no cover - must not be touched
+                raise AssertionError("proxy .on must not be accessed")
+
+        handlers = self._handlers()
+        handlers.bot_client = ClientProxy()
+
+        assert handlers._get_bot_client_on() is None
+
+    @pytest.mark.asyncio
+    async def test_cleanup_watcher_keeps_non_admin_messages(self):
+        from telethon.tl.types import MessageEntityTextUrl
+
+        handlers = self._handlers(cache=self._Cache({"form_test": {"text": "ok"}}))
+        handlers.kernel.ADMIN_ID = 1
+        handlers._setup_inline_button_cleanup_watcher()
+
+        event = SimpleNamespace(
+            sender_id=2,
+            message=SimpleNamespace(
+                entities=[MessageEntityTextUrl(5, 3, "tg://btn/form_test")],
+                via_bot_id=777,
+            ),
+            delete=AsyncMock(),
+        )
+
+        await handlers.kernel.register.handlers[0](event)
+
+        event.delete.assert_not_awaited()
+
+
 class TestInlineParsing:
     """Test inline query parsing"""
 
