@@ -113,7 +113,7 @@ class Installation(ModuleBase):
                 "python3 -m core --no-web</pre>\n"
                 "{emoji_venv}<b> When installing MCUB inside <u><code>proot-distro</code></u> or <u><code>WSL</code></u> it is recommended to create a <u>venv</u>:</b>\n"
                 '<pre><code class="language-shell">python3 -m venv .venv\n'
-                "source .venv/bin/activate # Bash"
+                "source .venv/bin/activate # Bash\n"
                 "source .venv/bin/activate.fish # Fish</code></pre>\n"
                 "{emoji_tip} TIP: recommended to add to cfg shell (bash):</b>\n"
                 "<pre><code class=\"language-shell\">echo 'source $HOME/.venv/activate' >> ~/.bashrc</code></pre>\n"
