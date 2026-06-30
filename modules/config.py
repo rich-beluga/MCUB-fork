@@ -83,6 +83,7 @@ CUSTOM_EMOJI = {
 ITEMS_PER_PAGE = 16
 MODULES_PER_PAGE = 12
 INLINE_RESULTS_LIMIT = 50
+LONG_VALUE_BLOCKQUOTE_LIMIT = 300
 
 TYPE_EMOJIS = {
     "str": "📝",
@@ -455,6 +456,11 @@ def register(kernel):
     def get_type_emoji(value_type):
         return TYPE_EMOJIS.get(value_type, "📎")
 
+    def wrap_long_display_value(display_value, raw_value):
+        if len(str(raw_value)) > LONG_VALUE_BLOCKQUOTE_LIMIT:
+            return f"<blockquote expandable>{display_value}</blockquote>"
+        return display_value
+
     def truncate_key(key, max_length=15):
         if len(key) > max_length:
             return key[: max_length - 3] + "..."
@@ -481,6 +487,7 @@ def register(kernel):
             if isinstance(value, (dict, list)):
                 formatted_value = json.dumps(value, ensure_ascii=False, indent=2)
                 display_value = f"<pre>{html.escape(formatted_value)}</pre>"
+                display_value = wrap_long_display_value(display_value, formatted_value)
             elif value is None:
                 display_value = "<code>null</code>"
             elif isinstance(value, bool):
@@ -490,8 +497,11 @@ def register(kernel):
             elif isinstance(value, str):
                 escaped_value = html.escape(value)
                 display_value = f"<code>{escaped_value}</code>"
+                display_value = wrap_long_display_value(display_value, value)
             else:
-                display_value = f"<code>{html.escape(str(value))}</code>"
+                raw_value = str(value)
+                display_value = f"<code>{html.escape(raw_value)}</code>"
+                display_value = wrap_long_display_value(display_value, raw_value)
 
         text = t(
             "key_view",
@@ -1184,12 +1194,14 @@ def register(kernel):
         elif isinstance(value, (dict, list)):
             formatted_value = json.dumps(value, ensure_ascii=False, indent=2)
             display_value = f"<pre>{html.escape(formatted_value)}</pre>"
+            display_value = wrap_long_display_value(display_value, formatted_value)
         elif value is None:
             if config_value is not None and config_value.default is not None:
                 default_str = str(config_value.default)
                 display_value = (
                     f"<code>{html.escape(default_str)}</code> <i>(default)</i>"
                 )
+                display_value = wrap_long_display_value(display_value, default_str)
             else:
                 display_value = "<code>null</code>"
         elif isinstance(value, bool):
@@ -1197,8 +1209,11 @@ def register(kernel):
         elif isinstance(value, str):
             escaped_value = html.escape(value)
             display_value = f"<code>{escaped_value}</code>"
+            display_value = wrap_long_display_value(display_value, value)
         else:
-            display_value = f"<code>{html.escape(str(value))}</code>"
+            raw_value = str(value)
+            display_value = f"<code>{html.escape(raw_value)}</code>"
+            display_value = wrap_long_display_value(display_value, raw_value)
 
         text = t(
             "key_view",
@@ -3225,6 +3240,9 @@ def register(kernel):
                 if isinstance(value, (dict, list)):
                     formatted_value = json.dumps(value, ensure_ascii=False, indent=2)
                     display_value = f"<pre>{html.escape(formatted_value)}</pre>"
+                    display_value = wrap_long_display_value(
+                        display_value, formatted_value
+                    )
                 elif value is None:
                     display_value = "<code>null</code>"
                 elif isinstance(value, bool):
@@ -3234,8 +3252,11 @@ def register(kernel):
                 elif isinstance(value, str):
                     escaped_value = html.escape(value)
                     display_value = f"<code>{escaped_value}</code>"
+                    display_value = wrap_long_display_value(display_value, value)
                 else:
-                    display_value = f"<code>{html.escape(str(value))}</code>"
+                    raw_value = str(value)
+                    display_value = f"<code>{html.escape(raw_value)}</code>"
+                    display_value = wrap_long_display_value(display_value, raw_value)
 
                 text = t(
                     "key_view",
