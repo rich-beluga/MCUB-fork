@@ -5,10 +5,8 @@ from __future__ import annotations
 
 import asyncio
 
-from telethon import events
-
-from core.lib.types import InlineMessage, Event
 from core.lib.loader.module_base import ModuleBase, bot_command, callback
+from core.lib.types import Event, InlineMessage
 from utils.strings import Strings
 
 
