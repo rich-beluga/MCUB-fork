@@ -5,9 +5,8 @@ from __future__ import annotations
 
 import asyncio
 
-from telethon import events
-
 from core.lib.loader.module_base import ModuleBase, bot_command, callback
+from core.lib.types import Event, InlineMessage
 from utils.strings import Strings
 
 
@@ -40,7 +39,7 @@ class CommandModule(ModuleBase):
             self.log.error(f"{self.strings['start_init_error']}: {e}")
 
     @bot_command("start")
-    async def cmd_start(self, event: events.NewMessage.Event) -> None:
+    async def cmd_start(self, event: Event) -> None:
         self.log.debug(f"start_handler chat_id={getattr(event, 'chat_id', None)}")
         s = self.strings
         await event.reply(
@@ -67,7 +66,7 @@ class CommandModule(ModuleBase):
         )
 
     @bot_command("profile")
-    async def cmd_profile(self, event: events.NewMessage.Event) -> None:
+    async def cmd_profile(self, event: Event) -> None:
         self.log.debug(f"profile_handler user_id={getattr(event, 'sender_id', None)}")
         s = self.strings
         user = event.sender
@@ -105,7 +104,7 @@ class CommandModule(ModuleBase):
         )
 
     @bot_command("init")
-    async def cmd_init(self, event: events.NewMessage.Event) -> None:
+    async def cmd_init(self, event: Event) -> None:
         s = self.strings
         if not event.is_private or event.sender.bot:
             return
@@ -146,7 +145,7 @@ class CommandModule(ModuleBase):
             pass
 
     @bot_command("delete_mcub_bot")
-    async def cmd_delete_bot(self, event: events.NewMessage.Event) -> None:
+    async def cmd_delete_bot(self, event: Event) -> None:
         s = self.strings
         if not event.is_group and not event.is_channel:
             return
@@ -157,20 +156,18 @@ class CommandModule(ModuleBase):
         await self.kernel.bot_client.delete_dialog(event.chat_id)
 
     @bot_command("ping")
-    async def cmd_ping(self, event: events.NewMessage.Event) -> None:
+    async def cmd_ping(self, event: Event) -> None:
         await event.reply(
             '<blockquote><tg-emoji emoji-id="6010179991944305029">☺️</tg-emoji> Pong!</blockquote>',
             parse_mode="html",
         )
 
-    @bot_command("mitrich")
-    async def cmd_mitrich(self, event: events.NewMessage.Event) -> None:
-        await event.reply("чoooooooooo, митpич????")
+    # @bot_command("mitrich")
+    # async def cmd_mitrich(self, event: Event) -> None:
+    #     await event.reply("чoooooooooo, митpич????")
 
     @callback()
-    async def cb_language(
-        self, event: events.CallbackQuery.Event, data: str | None = None
-    ) -> None:
+    async def cb_language(self, event: InlineMessage, data: str | None = None) -> None:
         lang = data.replace("start_lang_", "") if data else "en"
 
         self.kernel.config["language"] = lang
@@ -178,8 +175,6 @@ class CommandModule(ModuleBase):
 
         # Get original strings dict from class
         strings_dict = type(self).__dict__.get("strings")
-
-        # Create new Strings instance with new language
 
         if strings_dict:
             self._strings = Strings(self.kernel, strings_dict)
@@ -207,7 +202,6 @@ class CommandModule(ModuleBase):
                 )
             ],
         )
-        await event.answer(self.strings("setup_completed"), alert=True)
 
         await asyncio.sleep(1)
         backup_buttons = [
@@ -228,9 +222,7 @@ class CommandModule(ModuleBase):
         )
 
     @callback()
-    async def cb_backup(
-        self, event: events.CallbackQuery.Event, data: str | None = None
-    ) -> None:
+    async def cb_backup(self, event: InlineMessage, data: str | None = None) -> None:
         s = self.strings
         if not data:
             return
@@ -292,7 +284,6 @@ class CommandModule(ModuleBase):
                     f"<b>{s['backup_setup']}</b>\n\n{s['backup_disabled']}",
                     parse_mode="html",
                 )
-                await event.answer(s["backup_disabled"], alert=True)
 
         elif data.startswith("backup_interval:"):
             interval = int(data.replace("backup_interval:", ""))
@@ -309,7 +300,7 @@ class CommandModule(ModuleBase):
                     await self.kernel.save_module_config(
                         mod_name,
                         {
-                            "backup_chat_id": None,
+                            "backup_chat_id": getattr(self.kernel, "log_chat_id", None),
                             "backup_interval_hours": interval,
                             "last_backup_time": None,
                             "backup_count": 0,
@@ -327,7 +318,6 @@ class CommandModule(ModuleBase):
                         f"<b>{s['backup_setup']}</b>\n\n{s['backup_enabled']} ({interval}h)",
                         parse_mode="html",
                     )
-                await event.answer(f"{s['backup_enabled']} ({interval}h)", alert=True)
             else:
                 await event.edit(s["backup_not_found"], parse_mode="html")
 
@@ -339,7 +329,7 @@ class CommandModule(ModuleBase):
             await event.answer(s["backup_disabled"], alert=True)
 
     @callback()
-    async def cb_backup_interval(self, event: events.CallbackQuery.Event) -> None:
+    async def cb_backup_interval(self, event: InlineMessage) -> None:
         interval = int(
             event.data.decode().replace("backup_interval:", "")
             if isinstance(event.data, bytes)
@@ -376,16 +366,12 @@ class CommandModule(ModuleBase):
                     f"<b>{self.strings('backup_setup')}</b>\n\n{self.strings('backup_enabled')} ({interval}h)",
                     parse_mode="html",
                 )
-            await event.answer(
-                f"{self.strings('backup_enabled')} ({interval}h)", alert=True
-            )
         else:
             await event.edit(self.strings("backup_not_found"), parse_mode="html")
 
     @callback()
-    async def cb_backup_skip(self, event: events.CallbackQuery.Event) -> None:
+    async def cb_backup_skip(self, event: InlineMessage) -> None:
         await event.edit(
             f"<b>{self.strings('backup_setup')}</b>\n\n{self.strings('backup_disabled')}",
             parse_mode="html",
         )
-        await event.answer(self.strings("backup_disabled"), alert=True)

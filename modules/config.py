@@ -79,10 +79,19 @@ CUSTOM_EMOJI = {
     "🧩": '<tg-emoji emoji-id="5359785904535774578">🧩</tg-emoji>',
     "🔧": '<tg-emoji emoji-id="5332654441508119011">🔧</tg-emoji>',
 }
+# API for module
+USER_EMOJI = {
+    6020965582: "5469888215802482605",
+    2037125547: "5467932472379480411",
+    779572293: "5470163024989952512",
+    8405520863: "5470170528297817805",
+    855890735: "5470063433288290290",
+}
 
 ITEMS_PER_PAGE = 16
 MODULES_PER_PAGE = 12
 INLINE_RESULTS_LIMIT = 50
+LONG_VALUE_BLOCKQUOTE_LIMIT = 300
 
 TYPE_EMOJIS = {
     "str": "📝",
@@ -455,6 +464,11 @@ def register(kernel):
     def get_type_emoji(value_type):
         return TYPE_EMOJIS.get(value_type, "📎")
 
+    def wrap_long_display_value(display_value, raw_value):
+        if len(str(raw_value)) > LONG_VALUE_BLOCKQUOTE_LIMIT:
+            return f"<blockquote expandable>{display_value}</blockquote>"
+        return display_value
+
     def truncate_key(key, max_length=15):
         if len(key) > max_length:
             return key[: max_length - 3] + "..."
@@ -481,6 +495,7 @@ def register(kernel):
             if isinstance(value, (dict, list)):
                 formatted_value = json.dumps(value, ensure_ascii=False, indent=2)
                 display_value = f"<pre>{html.escape(formatted_value)}</pre>"
+                display_value = wrap_long_display_value(display_value, formatted_value)
             elif value is None:
                 display_value = "<code>null</code>"
             elif isinstance(value, bool):
@@ -490,8 +505,11 @@ def register(kernel):
             elif isinstance(value, str):
                 escaped_value = html.escape(value)
                 display_value = f"<code>{escaped_value}</code>"
+                display_value = wrap_long_display_value(display_value, value)
             else:
-                display_value = f"<code>{html.escape(str(value))}</code>"
+                raw_value = str(value)
+                display_value = f"<code>{html.escape(raw_value)}</code>"
+                display_value = wrap_long_display_value(display_value, raw_value)
 
         text = t(
             "key_view",
@@ -1184,12 +1202,14 @@ def register(kernel):
         elif isinstance(value, (dict, list)):
             formatted_value = json.dumps(value, ensure_ascii=False, indent=2)
             display_value = f"<pre>{html.escape(formatted_value)}</pre>"
+            display_value = wrap_long_display_value(display_value, formatted_value)
         elif value is None:
             if config_value is not None and config_value.default is not None:
                 default_str = str(config_value.default)
                 display_value = (
                     f"<code>{html.escape(default_str)}</code> <i>(default)</i>"
                 )
+                display_value = wrap_long_display_value(display_value, default_str)
             else:
                 display_value = "<code>null</code>"
         elif isinstance(value, bool):
@@ -1197,8 +1217,11 @@ def register(kernel):
         elif isinstance(value, str):
             escaped_value = html.escape(value)
             display_value = f"<code>{escaped_value}</code>"
+            display_value = wrap_long_display_value(display_value, value)
         else:
-            display_value = f"<code>{html.escape(str(value))}</code>"
+            raw_value = str(value)
+            display_value = f"<code>{html.escape(raw_value)}</code>"
+            display_value = wrap_long_display_value(display_value, raw_value)
 
         text = t(
             "key_view",
@@ -1574,6 +1597,17 @@ def register(kernel):
         except Exception as e:
             await event.answer(t("error", error=str(e)[:50]), alert=True)
 
+    def fcfg_confirm_article_text(event, confirm_id: str) -> str:
+        btn_id = html.escape(f"fcfg_confirm_{confirm_id}", quote=True)
+        if not getattr(event, "sender_id", False) == getattr(kernel, "ADMIN_ID", False):
+            tip = "\n🗿 <em>The message will not be deleted on its own....</em>"
+        else:
+            tip = "\n⏳ <em>This message will be deleted!</em>"
+        return (
+            f"🎲 <strong><a href='tg://btn/{btn_id}'>"
+            "I send a request to the module...​</a></strong>"
+        ) + tip
+
     async def generate_simple_set_article(
         event,
         key_id,
@@ -1617,7 +1651,7 @@ def register(kernel):
                 id=confirm_id,
                 title=f"✅ Set: {scope_prefix}{key} = {value_str[:50]}",
                 description=f"✅ Set: {scope_prefix}{key} = {value_str[:50]}",
-                text=t("fcfg_confirm_text"),
+                text=fcfg_confirm_article_text(event, confirm_id),
                 parse_mode="html",
             )
 
@@ -1669,7 +1703,7 @@ def register(kernel):
                     id=confirm_id,
                     title=t("list_add_confirm", value=value_str[:50]),
                     description=t("list_add_confirm", value=value_str[:50]),
-                    text=t("fcfg_confirm_text"),
+                    text=fcfg_confirm_article_text(event, confirm_id),
                     parse_mode="html",
                 )
 
@@ -1718,7 +1752,7 @@ def register(kernel):
                     description=t(
                         "dict_add_confirm", key=subkey, value=dict_value_str[:30]
                     ),
-                    text=t("fcfg_confirm_text"),
+                    text=fcfg_confirm_article_text(event, confirm_id),
                     parse_mode="html",
                 )
 
@@ -1772,7 +1806,7 @@ def register(kernel):
                     description=t(
                         "list_remove_confirm", index=index, value=str(item)[:50]
                     ),
-                    text=t("fcfg_confirm_text"),
+                    text=fcfg_confirm_article_text(event, confirm_id),
                     parse_mode="html",
                 )
                 builders.append(builder)
@@ -1811,7 +1845,7 @@ def register(kernel):
                     id=confirm_id,
                     title=t("dict_remove_confirm", key=subkey),
                     description=f"Знaчeниe: {str(value)[:50]}...",
-                    text=t("fcfg_confirm_text"),
+                    text=fcfg_confirm_article_text(event, confirm_id),
                     parse_mode="html",
                 )
                 builders.append(builder)
@@ -1884,7 +1918,7 @@ def register(kernel):
                             old=str(item)[:30],
                             new=value_str[:30],
                         ),
-                        text=t("fcfg_confirm_text"),
+                        text=fcfg_confirm_article_text(event, confirm_id),
                         parse_mode="html",
                     )
                     builders.append(builder)
@@ -1935,7 +1969,7 @@ def register(kernel):
                             old=str(old_value)[:30],
                             new=value_str[:30],
                         ),
-                        text=t("fcfg_confirm_text"),
+                        text=fcfg_confirm_article_text(event, confirm_id),
                         parse_mode="html",
                     )
                     builders.append(builder)
@@ -3214,6 +3248,9 @@ def register(kernel):
                 if isinstance(value, (dict, list)):
                     formatted_value = json.dumps(value, ensure_ascii=False, indent=2)
                     display_value = f"<pre>{html.escape(formatted_value)}</pre>"
+                    display_value = wrap_long_display_value(
+                        display_value, formatted_value
+                    )
                 elif value is None:
                     display_value = "<code>null</code>"
                 elif isinstance(value, bool):
@@ -3223,8 +3260,11 @@ def register(kernel):
                 elif isinstance(value, str):
                     escaped_value = html.escape(value)
                     display_value = f"<code>{escaped_value}</code>"
+                    display_value = wrap_long_display_value(display_value, value)
                 else:
-                    display_value = f"<code>{html.escape(str(value))}</code>"
+                    raw_value = str(value)
+                    display_value = f"<code>{html.escape(raw_value)}</code>"
+                    display_value = wrap_long_display_value(display_value, raw_value)
 
                 text = t(
                     "key_view",
@@ -3359,7 +3399,7 @@ def register(kernel):
     async def cfg_handler(event):
         await ensure_config_initialized()
         try:
-            args = event.text.split()
+            args = event.raw_text.split()
             if len(args) == 1:
                 if hasattr(kernel, "bot_client"):
                     try:
@@ -3463,7 +3503,7 @@ def register(kernel):
             parsed_args = None
             try:
                 parsed_args = parse_arguments(
-                    event.text, getattr(kernel, "custom_prefix", ".")
+                    event.raw_text, getattr(kernel, "custom_prefix", ".")
                 )
                 args = [parsed_args.command, *map(str, parsed_args.args)]
             except Exception:
@@ -3995,7 +4035,18 @@ def register(kernel):
     kernel.register_callback_handler("cfg_close", config_callback_handler)
 
     if hasattr(kernel, "bot_client") and kernel.bot_client:
+        bot_client = kernel.bot_client
+        bot_client._mcub_config_chosen_result_handler = chosen_result_handler
 
-        @kernel.bot_client.on(events.Raw(types.UpdateBotInlineSend))
-        async def handle_chosen_result(event):
-            await chosen_result_handler(event)
+        if not getattr(bot_client, "_mcub_config_raw_handler_registered", False):
+            bot_client._mcub_config_raw_handler_registered = True
+
+            @bot_client.on(events.Raw(types.UpdateBotInlineSend))
+            async def handle_chosen_result(event):
+                handler = getattr(
+                    bot_client, "_mcub_config_chosen_result_handler", None
+                )
+                if handler is not None:
+                    await handler(event)
+
+            bot_client._mcub_config_raw_handler = handle_chosen_result

@@ -34,8 +34,8 @@ langbutton:
   btn_en: 🇬🇧 English
 
 core_inline:
-  no_access: You don't have access to inline MCUB bot
-  no_access_id: 'ID:'
+  no_access: I'm sorry, but you don't have access!
+  no_access_id: 'ID'
   mcub_bot_title: MCUB Bot
   version: Version
   modules: Modules

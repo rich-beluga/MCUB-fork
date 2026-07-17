@@ -172,19 +172,31 @@ def safe_extract_archive(
     raise ValueError("Unknown archive format")
 
 
+def _get_mcub_dir_path(api_id: int, api_hash: str) -> str:
+    """Return MCUB data directory path without creating it."""
+
+    key = f"{api_id}{api_hash}"
+    instance_hash = hashlib.sha256(key.encode()).hexdigest()[:16]
+    return os.path.expanduser(f"~/.MCUB/{instance_hash}")
+
+
+def _ensure_not_symlink(path: str) -> None:
+    """Refuse sensitive MCUB paths that are symlinks."""
+
+    if os.path.islink(path):
+        raise PermissionError(f"SECURITY: {path} is a symlink! Refusing to use.")
+
+
 def get_mcub_dir(api_id: int, api_hash: str) -> str:
-    """Get MCUB data directory based on API credentials.
+    """Get/create MCUB data directory based on API credentials.
 
     Returns:
         Path to $HOME/.MCUB/{hash(API_ID+API_HASH)[:16]}
     """
-    key = f"{api_id}{api_hash}"
-    instance_hash = hashlib.sha256(key.encode()).hexdigest()[:16]
-    mcub_dir = os.path.expanduser(f"~/.MCUB/{instance_hash}")
+    mcub_dir = _get_mcub_dir_path(api_id, api_hash)
 
     # Check for symlink BEFORE creating (symlink attack prevention)
-    if os.path.exists(mcub_dir) and os.path.islink(mcub_dir):
-        raise PermissionError(f"SECURITY: {mcub_dir} is a symlink! Refusing to use.")
+    _ensure_not_symlink(mcub_dir)
 
     # umask control for secure directory creation
     old_mask = os.umask(0o077)
@@ -215,10 +227,17 @@ def get_sessions_dir(api_id: int, api_hash: str) -> str:
 
 
 def session_exists(api_id: int, api_hash: str) -> bool:
-    """Check if session file exists in new or old location."""
+    """Check if session file exists in new or old location.
+
+    This check is intentionally read-only: setup/web-panel probes call it often,
+    so it must not create empty ``~/.MCUB/<hash>`` directories for credentials
+    that do not have a session yet.
+    """
     if api_id and api_hash:
-        sessions_dir = get_sessions_dir(api_id, api_hash)
-        if os.path.exists(f"{sessions_dir}/user_session.session"):
+        mcub_dir = _get_mcub_dir_path(api_id, api_hash)
+        _ensure_not_symlink(mcub_dir)
+        sessions_dir = os.path.join(mcub_dir, "sessions")
+        if os.path.exists(os.path.join(sessions_dir, "user_session.session")):
             return True
     return os.path.exists("user_session.session")
 

@@ -28,8 +28,8 @@ buttons:
   back_menu: 🔙 Menu
 
 core_inline:
-  no_access: "bash: EACCES: Permission denied"
-  no_access_id: 'UID: {sender_id}'
+  no_access: "I'm sorry, but you don't have access!"
+  no_access_id: 'ID'
   mcub_bot_title: mcubd
   version: uname -r
   modules: packages

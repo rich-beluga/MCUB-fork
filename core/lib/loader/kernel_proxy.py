@@ -58,9 +58,6 @@ PROTECTED_KERNEL_NAMES = frozenset(
         "error_load_modules",
         "_log",
         "_inline_cb_lock",
-        "MODULES_DIR",
-        "MODULES_LOADED_DIR",
-        "CONFIG_FILE",
     }
 )
 
@@ -73,13 +70,11 @@ PROTECTED_REGISTER_NAMES = frozenset({"kernel", "_kernel"})
 
 _CLIENT_DANGEROUS_METHODS = frozenset(
     {
-        # ── connection lifecycle ─────────────────────────────────
         "disconnect",
         "disconnect_coro",
         "reconnect",
         "connect",
         "run_until_disconnected",
-        # ── auth ─────────────────────────────────────────────────
         "logout",
         "log_out",
         "qr_login",
@@ -88,7 +83,6 @@ _CLIENT_DANGEROUS_METHODS = frozenset(
         "sign_up",
         "start",
         "send_code_request",
-        # ── session / config ─────────────────────────────────────
         "session",
         "session_name",
         "session_path",
@@ -106,20 +100,16 @@ _CLIENT_DANGEROUS_METHODS = frozenset(
         "add_event_handler",
         "remove_event_handler",
         "list_event_handlers",
-        # ── protection bypass ────────────────────────────────────
         "protection_mode",
         "set_protection_mode",
         "set_protection_policy",
-        # ── event / middleware management ────────────────────────
         "add_event_middleware",
         "remove_event_middleware",
         "add_request_middleware",
         "remove_request_middleware",
         "remove_module_handlers",
-        # ── proxy / updates ──────────────────────────────────────
         "set_proxy",
         "set_receive_updates",
-        # ── data export ──────────────────────────────────────────
         "takeout",
         "end_takeout",
     }
@@ -267,8 +257,6 @@ class ModuleKernelProxy:
             "__class__",
             "__repr__",
             "__dir__",
-            "MODULES_DIR",
-            "MODULES_LOADED_DIR",
         }
     )
 
@@ -933,7 +921,7 @@ class EventProxy:
         object.__setattr__(self, "_proxy_kernel", kernel)
         object.__setattr__(self, "_proxy_client_cache", None)
 
-    # -- internal helpers ---------------------------------------------------
+    # internal helpers
 
     def _get_proxy_client(self) -> ClientProxy:
         cache = object.__getattribute__(self, "_proxy_client_cache")
@@ -944,7 +932,7 @@ class EventProxy:
             object.__setattr__(self, "_proxy_client_cache", cache)
         return cache
 
-    # -- attribute access ---------------------------------------------------
+    # attribute access
 
     def __getattribute__(self, name: str) -> Any:
         # Intercept .client and ._client - return a proxied version
@@ -979,7 +967,7 @@ class EventProxy:
             raise AttributeError(f"Cannot delete proxy internal attribute: {name}")
         delattr(object.__getattribute__(self, "_proxied_event"), name)
 
-    # -- forwarding dunder methods -----------------------------------------
+    # forwarding dunder methods
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Forward event(...) - Telethon raw API calls."""

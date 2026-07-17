@@ -18,6 +18,8 @@ from telethon import Button, events
 from telethon.tl.types import (
     InputBotInlineMessageID,
     InputWebDocument,
+    MessageEntityTextUrl,
+    UpdateBotInlineSend,
 )
 
 from .api import (
@@ -266,6 +268,7 @@ class _TelethonCallbackAdapter:
 
 
 class InlineHandlers:
+    BTN_URL_PREFIX = "tg://btn/"
     EMOJI_TELESCOPE = '<tg-emoji emoji-id="5429283852684124412">🔭</tg-emoji>'
     EMOJI_BLOCK = '<tg-emoji emoji-id="5767151002666929821">🚫</tg-emoji>'
     EMOJI_CRYSTAL = '<tg-emoji emoji-id="5361837567463399422">🔮</tg-emoji>'
@@ -287,6 +290,7 @@ class InlineHandlers:
         self.lang = get_strings(kernel)
         self.kernel.logger.debug("[InlineHandlers] __init__")
         self._setup_inline_send_handler()
+        self._setup_inline_button_cleanup_watcher()
         self._cb_lock = threading.Lock()
         self._last_cleanup_time = 0.0
         self._cleanup_task: asyncio.Task | None = None
@@ -528,6 +532,13 @@ class InlineHandlers:
                 )
 
     def _get_bot_client_on(self):
+        if type(self.bot_client).__name__ == "ClientProxy":
+            self.kernel.logger.debug(
+                "[InlineHandlers] bot_client is a module proxy, "
+                "skipping Telethon .on registration"
+            )
+            return None
+
         try:
             on = self.bot_client.on
         except Exception as e:
@@ -536,6 +547,103 @@ class InlineHandlers:
             )
             return None
         return on if callable(on) else None
+
+    def _extract_btn_form_ids(self, message: Any) -> list[str]:
+        """Extract tg://btn/<id> targets from text-url entities."""
+        form_ids: list[str] = []
+        for entity in getattr(message, "entities", None) or []:
+            if not isinstance(entity, MessageEntityTextUrl):
+                continue
+
+            url = getattr(entity, "url", "") or ""
+            if not url.startswith(self.BTN_URL_PREFIX):
+                continue
+
+            form_id = url[len(self.BTN_URL_PREFIX) :].strip()
+            if form_id:
+                form_ids.append(form_id)
+
+        return form_ids
+
+    def _inline_btn_target_exists(self, form_id: str) -> bool:
+        cache = getattr(self.kernel, "cache", None)
+        if cache is not None:
+            if cache.get(form_id) is not None:
+                return True
+            if cache.get(f"inline_temp_{form_id}") is not None:
+                return True
+
+        return False
+
+    def _is_via_runtime_inline_bot(self, message: Any) -> bool:
+        via_bot = getattr(message, "via_bot", None)
+        via_bot_id = getattr(message, "via_bot_id", None)
+        if via_bot_id is None and via_bot is not None:
+            via_bot_id = getattr(via_bot, "id", None)
+
+        bot_user_id = getattr(self.kernel, "inline_bot_user_id", None)
+        if bot_user_id is not None and via_bot_id is not None:
+            try:
+                return int(via_bot_id) == int(bot_user_id)
+            except (TypeError, ValueError):
+                return False
+
+        if via_bot is None:
+            return False
+
+        via_username = (getattr(via_bot, "username", None) or "").lstrip("@").lower()
+        bot_username = (
+            (
+                getattr(self.kernel, "inline_bot_username", None)
+                or getattr(getattr(self.kernel, "inline_bot", None), "username", None)
+                or getattr(self.kernel, "config", {}).get("inline_bot_username")
+                or ""
+            )
+            .lstrip("@")
+            .lower()
+        )
+        return bool(via_username and bot_username and via_username == bot_username)
+
+    def _setup_inline_button_cleanup_watcher(self) -> None:
+        register = getattr(self.kernel, "register", None)
+        watcher = getattr(register, "watcher", None)
+        if not callable(watcher):
+            self.kernel.logger.debug(
+                "[InlineHandlers] register.watcher unavailable, "
+                "skipping inline button cleanup watcher"
+            )
+            return
+
+        async def mcub_inline_button_cleanup_watcher(event):
+            message = getattr(event, "message", event)
+            form_ids = self._extract_btn_form_ids(message)
+            if not form_ids:
+                return
+
+            sender_id = getattr(event, "sender_id", None) or getattr(
+                message, "sender_id", None
+            )
+            admin_id = getattr(self.kernel, "ADMIN_ID", None)
+            if admin_id is not None and sender_id != admin_id:
+                return
+
+            if not self._is_via_runtime_inline_bot(message):
+                return
+
+            if not any(self._inline_btn_target_exists(form_id) for form_id in form_ids):
+                return
+
+            try:
+                await event.delete()
+            except Exception as e:
+                self.kernel.logger.debug(
+                    "[InlineHandlers] inline button cleanup delete failed: %s", e
+                )
+
+        watcher(
+            mcub_inline_button_cleanup_watcher,
+            module=inspect.getmodule(type(self)),
+        )
 
     def _setup_inline_send_handler(self) -> None:
         # Only register with Telethon clients (which have .on() method).
@@ -561,7 +669,6 @@ class InlineHandlers:
 
         @on(events.Raw)
         async def inline_send_handler(event):
-            from telethon.tl.types import UpdateBotInlineSend
 
             self.kernel.logger.debug(
                 "[InlineHandlers] RAW event: %s",
@@ -571,7 +678,7 @@ class InlineHandlers:
             if isinstance(event, UpdateBotInlineSend):
                 self.kernel.logger.debug(
                     "[InlineHandlers] UpdateBotInlineSend received: "
-                    "id=%r user_id=%s query=%r",
+                    "id=%r user_id=%s query=%r " + f"all={event}",
                     getattr(event, "id", "?"),
                     getattr(event, "user_id", "?"),
                     getattr(event, "query", "?"),
@@ -1511,12 +1618,22 @@ class InlineHandlers:
                             mime_type="image/png",
                             attributes=[],
                         )
+                        if not getattr(event, "sender_id", False) == getattr(
+                            self.kernel, "ADMIN_ID", False
+                        ):
+                            tip = "\n🗿 <em>The message will not be deleted on its own....</em>"
+                        else:
+                            tip = "\n⏳ <em>This message will be deleted!</em>"
+
                         builder = event.builder.article(
                             id=query_cmd,
                             title="💣 Do not delete ID!",
                             description="✏️ Write the meaning...",
-                            text="🎲 <strong>I send a request to the module...</strong>\n"
-                            "🗿 <em>The message will not be deleted on its own....</em>",
+                            text=(
+                                f"🎲 <strong><a href='tg://btn/{html.escape(query_cmd, quote=True)}'>"
+                                "I send a request to the module...​</a></strong>"
+                            )
+                            + tip,
                             parse_mode="html",
                             thumb=thumb_paper,
                         )
@@ -1625,6 +1742,10 @@ class InlineHandlers:
             )
             self.kernel.logger.error(f"{self.lang['error']}: {e}")
             self.kernel.logger.error(f"Full traceback: {error_traceback}")
+            if getattr(self.kernel, "handler_error", False):
+                await self.kernel.handle_error(
+                    e, message=self.lang["error"], event=event
+                )
             thumb = InputWebDocument(
                 url="https://kappa.lol/qNFKBT",
                 size=0,
@@ -1644,9 +1765,15 @@ class InlineHandlers:
                     ]
                 )
             except Exception as answer_error:
-                self.kernel.logger.debug(
+                self.kernel.logger.error(
                     f"Inline query error answer failed: {answer_error}"
                 )
+                if getattr(self.kernel, "handler_error", False):
+                    await self.kernel.handle_error(
+                        answer_error,
+                        message="Inline query error answer failed",
+                        event=event,
+                    )
 
     async def process_callback_query(self, event: Any) -> None:
         """Process a callback query event.
@@ -1753,6 +1880,10 @@ class InlineHandlers:
                 traceback.format_exception(type(e), e, e.__traceback__)
             )
             self.kernel.logger.error(f"Error callback_handlers: {error_traceback}")
+            if getattr(self.kernel, "handler_error", False):
+                await self.kernel.handle_error(
+                    e, message="Error callback_handlers", event=event
+                )
             await event.answer(f"error: {e}")
 
     async def _handle_show_traceback(self, event, data_str: str) -> None:

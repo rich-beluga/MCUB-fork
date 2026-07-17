@@ -217,3 +217,14 @@ __pycache__/
 *.pyc
 *.swp
 backup_config.json
+custom/*.py
+custom/*.json
+custom/*.yaml
+custom/*.yml
+custom/*.toml
+custom/*.conf
+custom/*.cfg
+custom/*.ini
+custom/*.properties
+custom/*.properties
+custom/*.env
