@@ -95,7 +95,7 @@ class Installation(ModuleBase):
                 "python3 -m core --no-web</pre>\n"
                 "{emoji_venv}<b> When installing MCUB inside <u><code>proot-distro</code></u> or <u><code>WSL</code></u> it is recommended to create a <u>venv</u>:</b>\n"
                 '<pre><code class="language-shell">python3 -m venv .venv\n'
-                "source .venv/bin/activate # Bash"
+                "source .venv/bin/activate # Bash\n"
                 "source .venv/bin/activate.fish # Fish</code></pre>\n"
                 "{emoji_tip} TIP: We recommend adding this to the shell config (bash):</b>\n"
                 "<pre><code class=\"language-shell\">echo 'source $HOME/.venv/activate' >> ~/.bashrc</code></pre>\n"
@@ -350,8 +350,6 @@ class Installation(ModuleBase):
         clean = {k: v for k, v in self.config.to_dict().items() if v is not None}
         if clean:
             await self.kernel.save_module_config(self.name, clean)
-
-        self._OWNER_EMOJI = self.require_module("config", all_loaded=True).USER_EMOJI
 
     def _get_platform_emoji(self, key: str) -> str:
         cfg_key = {
